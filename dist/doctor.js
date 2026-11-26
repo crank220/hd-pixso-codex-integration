@@ -18989,7 +18989,7 @@ var PixsoUpstream = class {
     if (this.client) return this.client;
     if (this.connecting) return this.connecting;
     this.connecting = (async () => {
-      const client = new Client({ name: "hd-pixso-codex", version: "0.1.0" });
+      const client = new Client({ name: "hd-pixso-codex", version: "0.1.1" });
       const transport = new StreamableHTTPClientTransport(this.url, { fetch: (url2, init) => fetch(url2, { ...init, redirect: "error" }) });
       try {
         await client.connect(transport, { timeout: 1e4 });
@@ -19026,7 +19026,7 @@ var PixsoUpstream = class {
 var upstream = new PixsoUpstream(process.env.PIXSO_MCP_URL || "http://127.0.0.1:3667/mcp");
 try {
   const result = parseToolResult(await upstream.call("get_mcp_server_info"));
-  console.log(JSON.stringify({ ok: true, node: process.version, pixso: result, next: "\u5728 Pixso \u9009\u62E9\u76EE\u6807\u9875\u9762\uFF0C\u7136\u540E\u5728\u65B0 Codex \u4F1A\u8BDD\u4E2D\u4F7F\u7528 pixso-design\u3002" }, null, 2));
+  console.log(JSON.stringify({ ok: true, node: process.version, pixso: result, next: "\u5728 Pixso \u9009\u62E9\u76EE\u6807\u9875\u9762\uFF0C\u7136\u540E\u5728\u65B0 Codex \u4F1A\u8BDD\u4E2D\u4F7F\u7528 hd-design\u3002" }, null, 2));
 } catch (e) {
   console.error(JSON.stringify({ ok: false, error: e.message, next: "\u786E\u8BA4 Pixso \u5DF2\u542F\u52A8\u3001\u672C\u5730 MCP \u5DF2\u5F00\u542F\uFF0C\u9ED8\u8BA4\u5730\u5740\u4E3A http://127.0.0.1:3667/mcp\u3002" }, null, 2));
   process.exitCode = 1;

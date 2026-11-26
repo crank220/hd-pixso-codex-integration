@@ -22,6 +22,6 @@
 - [x] 1. `tests/canvas.test.js` → `src/canvas-runtime.js`: 在仿真 Plugin API 中验证只改目标范围、旧快照拒绝、组件/克隆复用、失败回滚；先执行红灯再实现。
 - [x] 2. `tests/project.test.js` → `src/project.js`, `src/config.js`: 临时 Vue 项目验证锁版本、组件优先级、品牌覆盖、符号链接边界与文件大小限制；所有项目文件只读。
 - [x] 3. `tests/integration.test.js` → `src/upstream.js`, `src/service.js`, `src/server.js`: 通过实际 SDK stdio 客户端测试发现工具、输入校验、会话变更、错误传播；真实 Pixso 只读连通检查。
-- [x] 4. `skills/pixso-design/SKILL.md`, `references/`: 写双窗口操作、映射与标注流程，缺失规范不冒充已检查；审查技能范围及敏感数据流。
+- [x] 4. `skills/hd-design/SKILL.md`, `references/`: 写双窗口操作、映射与标注流程，缺失规范不冒充已检查；审查技能范围及敏感数据流。
 - [x] 5. `plugin.json`, `mcp.json`, `.agents/plugins/marketplace.json`, `scripts/`: 官方 manifest schema 校验、完整依赖打包、安装与故障诊断说明、示例配置。
 - [x] 6. `npm run check`, `npm run dev`, `npm run smoke:live`, package 解压启动；提交并推送指定仓库，验证远端 commit。

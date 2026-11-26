@@ -1,6 +1,6 @@
 {
   "name": "hd-pixso-codex",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Codex 输入需求、Pixso 查看和编辑结果的双窗口设计插件。",
   "author": { "name": "crank220" },
   "skills": "./skills/",

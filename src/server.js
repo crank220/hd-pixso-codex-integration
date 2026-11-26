@@ -29,7 +29,7 @@ const operation = z.discriminatedUnion('op', [
 ]);
 const upstream = new PixsoUpstream(process.env.PIXSO_MCP_URL || 'http://127.0.0.1:3667/mcp');
 const service = new DesignService(upstream);
-const server = new McpServer({ name: 'hd-pixso-codex', version: '0.1.0' });
+const server = new McpServer({ name: 'hd-pixso-codex', version: '0.1.1' });
 function register(name, description, inputSchema, handler, readOnly = true) {
  server.registerTool(name, { description, inputSchema, annotations: { readOnlyHint: readOnly, destructiveHint: false, openWorldHint: false, idempotentHint: readOnly } }, async args => {
   try {

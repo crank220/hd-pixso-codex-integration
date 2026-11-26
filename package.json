@@ -1,6 +1,6 @@
 {
   "name": "hd-pixso-codex-integration",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "description": "Codex + Pixso desktop design workflow with scoped edits and Vue component mappings",

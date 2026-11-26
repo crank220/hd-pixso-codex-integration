@@ -46411,7 +46411,7 @@ var PixsoUpstream = class {
     if (this.client) return this.client;
     if (this.connecting) return this.connecting;
     this.connecting = (async () => {
-      const client = new Client({ name: "hd-pixso-codex", version: "0.1.0" });
+      const client = new Client({ name: "hd-pixso-codex", version: "0.1.1" });
       const transport = new StreamableHTTPClientTransport(this.url, { fetch: (url2, init) => fetch(url2, { ...init, redirect: "error" }) });
       try {
         await client.connect(transport, { timeout: 1e4 });
@@ -47132,7 +47132,7 @@ var operation = external_exports.discriminatedUnion("op", [
 ]);
 var upstream = new PixsoUpstream(process.env.PIXSO_MCP_URL || "http://127.0.0.1:3667/mcp");
 var service = new DesignService(upstream);
-var server = new McpServer({ name: "hd-pixso-codex", version: "0.1.0" });
+var server = new McpServer({ name: "hd-pixso-codex", version: "0.1.1" });
 function register(name, description, inputSchema, handler, readOnly = true) {
   server.registerTool(name, { description, inputSchema, annotations: { readOnlyHint: readOnly, destructiveHint: false, openWorldHint: false, idempotentHint: readOnly } }, async (args) => {
     try {

@@ -56,7 +56,7 @@ PIXSO_MCP_URL=http://127.0.0.1:3667/mcp node dist/doctor.js
 
 ### 兼容客户端：单独配置 MCP
 
-客户端不支持插件 marketplace 时，将下面的服务配置加入其 MCP 设置，并将插件中的 `skills/pixso-design` 按该客户端的技能安装方式添加。路径改为实际绝对路径：
+客户端不支持插件 marketplace 时，将下面的服务配置加入其 MCP 设置，并将插件中的 `skills/hd-design` 按该客户端的技能安装方式添加。路径改为实际绝对路径：
 
 ```json
 {
@@ -72,7 +72,7 @@ PIXSO_MCP_URL=http://127.0.0.1:3667/mcp node dist/doctor.js
 ## 第一次使用
 
 1. 在 Pixso 打开目标设计文件，选择需要修改的页面。若只允许改一个框架，可选中该框架并明确要求仅改选中范围。
-2. 在 Codex 新会话中调用 `pixso-design`，描述需求和页面名。插件先读取状态，再绑定范围。
+2. 在 Codex 新会话中调用 `$hd-design`，描述需求和页面名。插件先读取状态，再绑定范围。
 3. 有 Vue 项目时提供项目根目录；需要遵循公司规范时在 Pixso 打开规范文件供只读提取，然后回到目标文件。
 4. Codex 执行修改并核对截图，你回到 Pixso 检查和手动调整。
 5. 再次修改前，Codex 读取最新快照；检测到旧版本会停止该次写入，重新读取后重新判断。
@@ -120,7 +120,7 @@ PIXSO_MCP_URL=http://127.0.0.1:3667/mcp node dist/doctor.js
 | `inspect_vue_project` | 只读项目、锁版本与组件目录检查 |
 | `resolve_vue_component` | 按复用顺序选择映射或指出缺失 |
 
-图层操作细节见 [操作参考](skills/pixso-design/references/operations.md)。
+图层操作细节见 [操作参考](skills/hd-design/references/operations.md)。
 
 ## 校验与边界
 

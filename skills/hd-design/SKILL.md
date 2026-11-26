@@ -1,5 +1,5 @@
 ---
-name: pixso-design
+name: hd-design
 description: 在 Codex 输入 Web 设计需求，通过本地 Pixso MCP 读取与修改明确指定的页面，复用项目组件并核对 Vue/Ant Design Vue 映射和公司交互标注；适用于双窗口设计与已有稿件改版。
 ---
 

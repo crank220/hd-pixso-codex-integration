@@ -24,7 +24,7 @@ export class PixsoUpstream {
     if (this.client) return this.client;
     if (this.connecting) return this.connecting;
     this.connecting = (async () => {
-      const client = new Client({ name: 'hd-pixso-codex', version: '0.1.0' });
+      const client = new Client({ name: 'hd-pixso-codex', version: '0.1.1' });
       const transport = new StreamableHTTPClientTransport(this.url, { fetch: (url, init) => fetch(url, { ...init, redirect: 'error' }) });
       try {
         await client.connect(transport, { timeout: 10000 });
