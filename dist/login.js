@@ -6,7 +6,7 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
-// src/login.js
+// src/cli/login.js
 import { createServer } from "node:http";
 
 // node_modules/pkce-challenge/dist/index.node.js
@@ -9033,14 +9033,18 @@ async function registerClient(authorizationServerUrl, { metadata, clientMetadata
   return RegistrationResponseSchema.parse(await response.json());
 }
 
-// src/oauth.js
+// src/auth/oauth-provider.js
 import { mkdir, readFile, writeFile, rename, chmod } from "node:fs/promises";
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { randomBytes } from "node:crypto";
 var AUTH_HELP = "REMOTE_AUTH_REQUIRED: run node <plugin-root>/dist/login.js to authorize Pixso, then retry; or set PIXSO_PERSONAL_TOKEN in the MCP server environment";
 var PixsoOAuthProvider = class {
-  constructor({ directory = process.env.HD_PIXSO_AUTH_DIR || join(homedir(), ".config", "hd-design"), redirectUrl = "http://127.0.0.1:9417/callback", onRedirect } = {}) {
+  constructor({
+    directory = process.env.HD_PIXSO_AUTH_DIR || join(homedir(), ".config", "hd-design"),
+    redirectUrl = "http://127.0.0.1:9417/callback",
+    onRedirect
+  } = {}) {
     this.directory = directory;
     this.file = join(directory, "pixso-oauth.json");
     this._redirectUrl = redirectUrl;
@@ -9051,11 +9055,19 @@ var PixsoOAuthProvider = class {
     return this._redirectUrl;
   }
   get clientMetadata() {
-    return { client_name: "HD Design", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none", scope: "mcp:connect" };
+    return {
+      client_name: "HD Design",
+      redirect_uris: [this.redirectUrl],
+      grant_types: ["authorization_code", "refresh_token"],
+      response_types: ["code"],
+      token_endpoint_auth_method: "none",
+      scope: "mcp:connect"
+    };
   }
   state() {
     return this.nonce;
   }
+  /** 凭据绑定官方 MCP endpoint；文件不存在视为未登录，损坏文件必须明确报错。 */
   async read() {
     try {
       const s = JSON.parse(await readFile(this.file, "utf8"));
@@ -9065,11 +9077,16 @@ var PixsoOAuthProvider = class {
       throw Error("OAUTH_STORE_UNREADABLE: repair the local credential store");
     }
   }
+  /** 临时文件以 0600 写入后 rename；不将 token 写入项目、插件目录或 stdout。 */
   async save(key, value) {
     const data = await this.read();
     await mkdir(this.directory, { recursive: true, mode: 448 });
     const temp = join(this.directory, `oauth-${randomBytes(12).toString("hex")}.tmp`);
-    await writeFile(temp, JSON.stringify({ ...data, endpoint: "https://pixso.cn/mcp", [key]: value }), { mode: 384, flag: "wx" });
+    await writeFile(
+      temp,
+      JSON.stringify({ ...data, endpoint: "https://pixso.cn/mcp", [key]: value }),
+      { mode: 384, flag: "wx" }
+    );
     await rename(temp, this.file);
     await chmod(this.file, 384);
   }
@@ -9079,9 +9096,11 @@ var PixsoOAuthProvider = class {
   async saveClientInformation(value) {
     await this.save("client", value);
   }
+  /** expiresAt 的单位为毫秒；过期后保留 refresh_token，交给 SDK 刷新。 */
   async tokens() {
     const d = await this.read();
-    if (d.expiresAt && Date.now() >= d.expiresAt) return d.tokens ? { ...d.tokens, expires_in: 0 } : void 0;
+    if (d.expiresAt && Date.now() >= d.expiresAt)
+      return d.tokens ? { ...d.tokens, expires_in: 0 } : void 0;
     return d.tokens;
   }
   async saveTokens(value) {
@@ -9099,6 +9118,7 @@ var PixsoOAuthProvider = class {
     if (!this.verifier) throw Error("OAUTH_VERIFIER_MISSING");
     return this.verifier;
   }
+  /** 按 SDK 指定范围失效凭据，清除 token 时保留仍有效的 client 注册信息。 */
   async invalidateCredentials(scope) {
     if (scope === "verifier") {
       this.verifier = void 0;
@@ -9112,17 +9132,22 @@ var PixsoOAuthProvider = class {
   }
 };
 function validateCallback(url2, provider2) {
-  if (url2.pathname !== "/callback" || url2.searchParams.get("state") !== provider2.nonce) throw Error("OAUTH_STATE_MISMATCH");
+  if (url2.pathname !== "/callback" || url2.searchParams.get("state") !== provider2.nonce)
+    throw Error("OAUTH_STATE_MISMATCH");
   if (url2.searchParams.has("error")) throw Error("OAUTH_DENIED");
   const code = url2.searchParams.get("code");
   if (!code) throw Error("OAUTH_CODE_MISSING");
   return code;
 }
 
-// src/login.js
-var provider = new PixsoOAuthProvider({ onRedirect: (url2) => process.stderr.write(`\u5728\u6D4F\u89C8\u5668\u6253\u5F00\u6B64\u5730\u5740\u5B8C\u6210 Pixso \u6388\u6743\uFF08\u4E0D\u8981\u5206\u4EAB\u6B64\u6388\u6743\u5730\u5740\uFF09\uFF1A
+// src/cli/login.js
+var provider = new PixsoOAuthProvider({
+  onRedirect: (url2) => process.stderr.write(
+    `\u5728\u6D4F\u89C8\u5668\u6253\u5F00\u6B64\u5730\u5740\u5B8C\u6210 Pixso \u6388\u6743\uFF08\u4E0D\u8981\u5206\u4EAB\u6B64\u6388\u6743\u5730\u5740\uFF09\uFF1A
 ${url2.href}
-`) });
+`
+  )
+});
 var resolveDone;
 var rejectDone;
 var consumed = false;
@@ -9144,7 +9169,10 @@ var server = createServer(async (req, res) => {
   }
   consumed = true;
   try {
-    const result = await auth(provider, { serverUrl: "https://pixso.cn/mcp", authorizationCode: code });
+    const result = await auth(provider, {
+      serverUrl: "https://pixso.cn/mcp",
+      authorizationCode: code
+    });
     if (result !== "AUTHORIZED") throw Error("OAUTH_NOT_AUTHORIZED");
     res.writeHead(200, { "Content-Type": "text/plain;charset=utf-8" }).end("HD Design \u5DF2\u8FDE\u63A5 Pixso\u3002\u53EF\u5173\u95ED\u6B64\u9875\u9762\uFF0C\u56DE\u5230 Codex \u91CD\u8BD5\u8FDC\u7A0B\u8FDE\u63A5\u3002");
     resolveDone();

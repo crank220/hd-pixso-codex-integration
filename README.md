@@ -53,7 +53,7 @@ $hd-design
 
 ## 插件能力
 
-在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.0 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.1 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
 - 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
 - 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
@@ -70,7 +70,7 @@ codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.0**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.1**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
 ## 选择连接模式
 
@@ -122,7 +122,7 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 
 ## 组件映射
 
-配置放在业务项目根目录 `.pixso-codex.json`，参见 [示例](pixso-codex.example.json) 与 [映射参考](skills/hd-design/references/component-mapping.md)。同名候选不代表真实映射；缺少映射时报告待建立，不假装实例化。公司规范与UI组件规范分别读取。
+配置放在业务项目根目录 `.pixso-codex.json`，参见 [示例](examples/pixso-codex.example.json) 与 [映射参考](skills/hd-design/references/component-mapping.md)。同名候选不代表真实映射；缺少映射时报告待建立，不假装实例化。公司规范与UI组件规范分别读取。
 
 ## MCP 工具
 
@@ -144,9 +144,13 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 
 ## 开发与检查
 
+源码已按职责分类，目录与依赖边界见[开发结构说明](docs/architecture.md)，版本变化见[更新记录](docs/changelog.md)。`dist/` 是可直接运行的发布产物，源码调整后通过构建更新，不手动编辑。
+
 ```sh
 npm ci
 npm run dev           # stdio MCP开发进程，不是网页服务器
+npm run format        # 源码、脚本与测试统一两个空格缩进
+npm run format:check  # 只检查格式，不改文件
 npm run check         # 测试、build、manifest/包验证
 npm run test:design   # 内置 UI/UX Pro Max 检索
 npm run doctor        # 当前配置连接检查
