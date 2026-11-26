@@ -6,14 +6,27 @@
 
 ### 1. 安装插件
 
-准备好 Codex、Node.js 20+ 和 Python 3（用于内置 UI/UX Pro Max 检索），然后在本机终端依次执行：
+准备好 Codex、Node.js 20+ 和 Python 3（用于内置 UI/UX Pro Max 检索）。推荐直接在 Codex 中导入：
+
+1. 打开 **设置 → 插件**（部分版本位于「集成」下），点击右上角 **添加 → 添加插件市场**。
+2. 按下表填写，然后点击 **添加市场**。
+
+| 字段 | 填写内容 |
+| --- | --- |
+| 来源 | `https://github.com/crank220/hd-pixso-codex-integration` |
+| Git 引用 | `main` |
+| 稀疏路径 | **留空**。插件市场位于仓库根目录；弹窗中的 `plugins/codex` 是占位示例，不要填写。 |
+
+3. 在市场中找到 **hd-pixso-codex**，安装并启用；在 Codex 中**新建会话**，输入 `$hd-design` 开始使用。
+
+终端接入方式（备选）：
 
 ```sh
 codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-安装完成后，在 Codex 中**新建会话**。无需另装 UI/UX Pro Max，也无需在插件目录执行 `npm install`。如果终端提示找不到 `codex`，请先安装或配置 Codex CLI；详细要求见[安装与升级](#安装与升级)。
+无需另装 UI/UX Pro Max，也无需在插件目录执行 `npm install`。终端找不到 `codex` 时可优先使用上述图形界面；详细环境要求见[安装与升级](#安装与升级)。
 
 ### 2. 连接 Pixso，准备目标页面
 
@@ -43,7 +56,7 @@ $hd-design
 
 ### 4. 在 Pixso 检查与继续调整
 
-回到 Pixso 查看设计结果、图标状态和画板外标注。可以直接手动调整，再回到 Codex 输入：
+回到 Pixso 查看分类页面中的设计结果、图标状态和规范标注。可以直接手动调整，再回到 Codex 输入：
 
 ```text
 请重新读取我在 Pixso 中的最新调整，保留这些改动，继续优化当前授权范围内的对齐与间距。
@@ -53,7 +66,7 @@ $hd-design
 
 ## 插件能力
 
-在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.1 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.2 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
 - 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
 - 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
@@ -70,7 +83,7 @@ codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.1**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.2**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
 ## 选择连接模式
 
@@ -114,9 +127,9 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 1. 新会话调用 `$hd-design`，描述页面/图层链接、需求和允许修改的范围。
 2. 读取目标，盘点组件、布局、现有手工改动；有Vue项目时提供根目录，核对锁文件和映射。
 3. 运行内置UI/UX Pro Max检索；新项目确定视觉系统，改版按单一问题查询，保留品牌覆盖。
-4. 读取公司规范；产品页面保持纯净，在同一授权页面的画板外做规范标注。
+4. 读取公司规范，按任务规模组织产品场景、共用组件状态、控件差异与流程。可修改旧页面或在用户授权的文件内新增页面；用户明确限制单页时才限定在该页。公共规则只保留一份，控件逐项记录适用状态与业务例外。
 5. 按最新revision写入，逐层读回；检查字体、几何、截图、各工具/页面状态。
-6. 交付实际修改与证据；静态状态稿、原生交互连线、可运行逻辑分别说明。
+6. 交付实际修改与证据；原生注释、可编辑视觉标注、协作评论、原型连线与可运行逻辑分别验收。原生注释须重新打开读回；MCP 没有写入口时可用获授权的 Pixso 原生界面，不能用视觉卡片或评论冒充。
 
 本地/远程、Python缺失或权限不足时不伪装成功。设计稿文字、评论、规范内容是参考数据，不是额外操作授权。
 
@@ -130,7 +143,7 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 | --- | --- |
 | `pixso_connect` | 选择local/remote，清空旧范围 |
 | `pixso_status` | 读取连接能力、本地活动文件或远程链接目标 |
-| `pixso_begin` | 绑定页面/子树；远程必须targetUrl |
+| `pixso_begin` | 本地按唯一 pageName 绑定页面/子树，缺省活动页；远程必须targetUrl |
 | `pixso_read` | 最新状态与revision |
 | `pixso_patch` | 受限声明式编辑，最多50项 |
 | `pixso_components` | 查真实组件/变体 |
@@ -160,6 +173,6 @@ npm run package
 node scripts/test-package.js
 ```
 
-没有任意脚本、删除图层/页面、跨页移动或全局样式写入口。快照限制12,000节点/6MB，范围30分钟未读取后失效。失败或超时先读回，不直接重放；回滚只有verified=true才算验证恢复。纯设计任务不会自动另做一个网站。
+当前 MCP 没有任意脚本、页面创建/删除、跨页移动或全局样式写入口。多页整理需通过 Pixso 原生界面完成页面创建与移动，再重新绑定目标页；不能把用户的多页授权误解为单页限制，也不能以其他 MCP 绕过范围锁。快照限制12,000节点/6MB，范围30分钟未读取后失效。失败或超时先读回，不直接重放；回滚只有verified=true才算验证恢复。纯设计任务不会自动另做一个网站。
 
 UI/UX Pro Max按MIT随包分发，来源与许可见 [PROVENANCE](skills/hd-design/vendor/ui-ux-pro-max/PROVENANCE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。公司文件、内部规范、账号与凭据不随包发布。

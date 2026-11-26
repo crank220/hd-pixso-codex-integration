@@ -65,7 +65,7 @@ register(
 );
 register(
   'pixso_begin',
-  '绑定指定页面或子树。本地使用活动文件，远程必须传targetUrl含item-id的图层链接；返回 scopeToken 与 revision，所有写入限于该范围。',
+  '绑定指定页面或子树。本地使用活动文件；pageName精确定位唯一页面，缺省绑定活动页。远程必须传targetUrl含item-id的图层链接；返回 scopeToken 与 revision，所有写入限于该范围。',
   {
     pageName: z.string().optional(),
     rootId: id.optional(),

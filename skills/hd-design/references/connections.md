@@ -2,7 +2,7 @@
 
 | 模式 | 地址 | 定位 |
 | --- | --- | --- |
-| local 默认 | http://127.0.0.1:3667/mcp | Pixso 桌面活动文档/页面/选区 |
+| local 默认 | http://127.0.0.1:3667/mcp | Pixso 桌面活动文档；显式 pageName 绑定唯一页面，缺省为活动页 |
 | remote | https://pixso.cn/mcp | OAuth或访问令牌 + 含item-id的容器图层链接 |
 
 `pixso_connect({mode:"remote"})` 切换到远程；`pixso_connect({mode:"local"})` 切回。本地保留 loopback HTTP 限制，远程仅接受官方 HTTPS 端点；本版不声称支持私有化域名。切换清空旧范围 token；不要将本地 token 用在远程连接。
@@ -24,3 +24,5 @@ https://pixso.cn/app/design/<fileKey>?item-id=123%3A456
 官方依据（核对日期2026-11-26）：
 - https://pixso.cn/developer/zh/mcp/remote-mcp.html
 - https://pixso.cn/developer/zh/mcp/tools.html
+
+本地 `pixso_begin({pageName:"03 控件差异与交互"})` 精确匹配当前文件的唯一页面，不改变设计师的活动页。重名返回 PAGE_NAME_AMBIGUOUS，缺失返回 PAGE_NAME_MISMATCH；一个 token 只绑定一个页面/子树。未传 pageName 的旧流程仍在切换活动页后拒写。

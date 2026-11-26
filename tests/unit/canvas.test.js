@@ -210,3 +210,39 @@ test('a hand edit during asynchronous font loading invalidates the patch before 
   );
   assert.equal(p.getNodeById('1:3').characters, '用户最新改字');
 });
+
+test('explicit local page name binds an inactive page without changing the active page', async () => {
+  const p = fakePixso();
+  const s = await run(p, { action: 'open', pageName: 'Protected' });
+  assert.equal(p.currentPage.id, '1:1');
+  assert.equal(s.scope.pageId, '2:1');
+  p.loadFontAsync = async () => {
+    p.currentPage = p.getNodeById('2:1');
+  };
+  const result = await run(p, {
+    action: 'apply',
+    scope: s.scope,
+    expectedState: s.state,
+    operations: [{ op: 'update', nodeId: '2:2', props: { text: 'Scoped update' } }],
+  });
+  assert.equal(result.verified, true);
+  assert.equal(p.getNodeById('2:2').characters, 'Scoped update');
+  const fresh = await run(p, { action: 'read', scope: s.scope });
+  await assert.rejects(
+    run(p, {
+      action: 'apply',
+      scope: s.scope,
+      expectedState: fresh.state,
+      operations: [{ op: 'update', nodeId: '1:3', props: { text: 'Wrong page' } }],
+    }),
+    /OUT_OF_SCOPE/,
+  );
+  assert.equal(p.getNodeById('1:3').characters, '模版');
+});
+
+test('explicit local page names reject missing or ambiguous matches', async () => {
+  const p = fakePixso();
+  await assert.rejects(run(p, { action: 'open', pageName: 'Missing' }), /PAGE_NAME_MISMATCH/);
+  p.getNodeById('2:1').name = 'gpt测试';
+  await assert.rejects(run(p, { action: 'open', pageName: 'gpt测试' }), /PAGE_NAME_AMBIGUOUS/);
+});

@@ -24,6 +24,16 @@ export async function canvasRuntime(input) {
     if (!p) throw Error('REMOTE_PAGE_NOT_FOUND');
     page = p;
   }
+  // 显式页面名只定位本文件唯一页面，不改变设计师的活动页；后续仍绑定该页 ID。
+  if (!target && input.action === 'open' && input.pageName) {
+    const matches = api.root.children.filter((p) => p.type === 'PAGE' && p.name === input.pageName);
+    if (matches.length !== 1)
+      fail(matches.length ? 'PAGE_NAME_AMBIGUOUS' : 'PAGE_NAME_MISMATCH', input.pageName);
+    page = matches[0];
+  } else if (!target && input.scope?.explicitPage) {
+    page = get(input.scope.pageId);
+    if (!page || page.type !== 'PAGE') fail('PAGE_CHANGED');
+  }
   const inside = (n, root) => {
     for (let p = n; p; p = p.parent) if (p.id === root.id) return true;
     return false;
@@ -136,8 +146,14 @@ export async function canvasRuntime(input) {
   if (input.action === 'open') {
     if (input.pageName && page.name !== input.pageName) fail('PAGE_NAME_MISMATCH', page.name);
     const root = input.rootId ? get(input.rootId) : page;
-    if (!root || !inside(root, page)) fail('OUT_OF_SCOPE', 'Target must be on the active page');
-    scope = { documentIdentity: identity(), pageId: page.id, rootId: root.id, pageName: page.name };
+    if (!root || !inside(root, page)) fail('OUT_OF_SCOPE', 'Target must be on the bound page');
+    scope = {
+      documentIdentity: identity(),
+      pageId: page.id,
+      rootId: root.id,
+      pageName: page.name,
+      ...(!target && input.pageName ? { explicitPage: true } : {}),
+    };
   }
   if (!scope) fail('SCOPE_REQUIRED');
   if (identity() !== scope.documentIdentity) fail('DOCUMENT_CHANGED');
@@ -453,7 +469,8 @@ export async function canvasRuntime(input) {
   }
   await Promise.all([...fontSet.values()].map((f) => api.loadFontAsync(f)));
   if (identity() !== scope.documentIdentity) fail('DOCUMENT_CHANGED');
-  if ((target ? page.id : api.currentPage.id) !== scope.pageId) fail('PAGE_CHANGED');
+  if ((target || scope.explicitPage ? page.id : api.currentPage.id) !== scope.pageId)
+    fail('PAGE_CHANGED');
   if (snapshot(root).state !== before.state)
     fail('STALE_REVISION', 'The design changed while loading fonts');
   for (const [id, state] of sourceStates)

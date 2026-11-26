@@ -46720,6 +46720,15 @@ async function canvasRuntime(input2) {
     if (!p) throw Error("REMOTE_PAGE_NOT_FOUND");
     page = p;
   }
+  if (!target && input2.action === "open" && input2.pageName) {
+    const matches = api.root.children.filter((p) => p.type === "PAGE" && p.name === input2.pageName);
+    if (matches.length !== 1)
+      fail(matches.length ? "PAGE_NAME_AMBIGUOUS" : "PAGE_NAME_MISMATCH", input2.pageName);
+    page = matches[0];
+  } else if (!target && input2.scope?.explicitPage) {
+    page = get(input2.scope.pageId);
+    if (!page || page.type !== "PAGE") fail("PAGE_CHANGED");
+  }
   const inside = (n, root2) => {
     for (let p = n; p; p = p.parent) if (p.id === root2.id) return true;
     return false;
@@ -46826,8 +46835,14 @@ async function canvasRuntime(input2) {
   if (input2.action === "open") {
     if (input2.pageName && page.name !== input2.pageName) fail("PAGE_NAME_MISMATCH", page.name);
     const root2 = input2.rootId ? get(input2.rootId) : page;
-    if (!root2 || !inside(root2, page)) fail("OUT_OF_SCOPE", "Target must be on the active page");
-    scope = { documentIdentity: identity(), pageId: page.id, rootId: root2.id, pageName: page.name };
+    if (!root2 || !inside(root2, page)) fail("OUT_OF_SCOPE", "Target must be on the bound page");
+    scope = {
+      documentIdentity: identity(),
+      pageId: page.id,
+      rootId: root2.id,
+      pageName: page.name,
+      ...!target && input2.pageName ? { explicitPage: true } : {}
+    };
   }
   if (!scope) fail("SCOPE_REQUIRED");
   if (identity() !== scope.documentIdentity) fail("DOCUMENT_CHANGED");
@@ -47090,7 +47105,8 @@ async function canvasRuntime(input2) {
   }
   await Promise.all([...fontSet.values()].map((f) => api.loadFontAsync(f)));
   if (identity() !== scope.documentIdentity) fail("DOCUMENT_CHANGED");
-  if ((target ? page.id : api.currentPage.id) !== scope.pageId) fail("PAGE_CHANGED");
+  if ((target || scope.explicitPage ? page.id : api.currentPage.id) !== scope.pageId)
+    fail("PAGE_CHANGED");
   if (snapshot(root).state !== before.state)
     fail("STALE_REVISION", "The design changed while loading fonts");
   for (const [id, state] of sourceStates)
@@ -47725,7 +47741,7 @@ register(
 );
 register(
   "pixso_begin",
-  "\u7ED1\u5B9A\u6307\u5B9A\u9875\u9762\u6216\u5B50\u6811\u3002\u672C\u5730\u4F7F\u7528\u6D3B\u52A8\u6587\u4EF6\uFF0C\u8FDC\u7A0B\u5FC5\u987B\u4F20targetUrl\u542Bitem-id\u7684\u56FE\u5C42\u94FE\u63A5\uFF1B\u8FD4\u56DE scopeToken \u4E0E revision\uFF0C\u6240\u6709\u5199\u5165\u9650\u4E8E\u8BE5\u8303\u56F4\u3002",
+  "\u7ED1\u5B9A\u6307\u5B9A\u9875\u9762\u6216\u5B50\u6811\u3002\u672C\u5730\u4F7F\u7528\u6D3B\u52A8\u6587\u4EF6\uFF1BpageName\u7CBE\u786E\u5B9A\u4F4D\u552F\u4E00\u9875\u9762\uFF0C\u7F3A\u7701\u7ED1\u5B9A\u6D3B\u52A8\u9875\u3002\u8FDC\u7A0B\u5FC5\u987B\u4F20targetUrl\u542Bitem-id\u7684\u56FE\u5C42\u94FE\u63A5\uFF1B\u8FD4\u56DE scopeToken \u4E0E revision\uFF0C\u6240\u6709\u5199\u5165\u9650\u4E8E\u8BE5\u8303\u56F4\u3002",
   {
     pageName: external_exports.string().optional(),
     rootId: nodeIdSchema.optional(),
