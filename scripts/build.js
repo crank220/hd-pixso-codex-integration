@@ -16,5 +16,5 @@ for (const dir of dirs) {
  if (!license) throw Error(`Missing redistribution license: ${pkg.name}`);
  notices.push(`=== ${pkg.name}@${pkg.version} (${pkg.license || 'see below'}) ===\n${license}`);
 }
-await writeFile('dist/THIRD_PARTY_LICENSES.txt', notices.join('\n\n'));
+await writeFile('dist/THIRD_PARTY_LICENSES.txt', notices.join('\n\n').split('\n').map(line => line.trimEnd()).join('\n'));
 console.log(`Built standalone runtime bundles and ${notices.length} dependency license notices`);
