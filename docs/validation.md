@@ -1,5 +1,9 @@
 # 验证记录
 
+## 0.2.3 · 2026-11-26
+
+本次仅修正注释编写规则及版本元数据，未写入或恢复 Pixso 注释。`npm run check`（39项回归）、技能 quick_validate 和 ZIP 独立启动检查通过。
+
 ## 0.2.2 · 2026-11-26
 
 - `npm run check` 通过：39 项回归、格式、独立入口构建与 manifest/schema；`test:design`、技能 quick_validate、ZIP 独立启动检查通过。`npm run dev` 启动后正常结束，真实本地只读 smoke 读回稳定 revision。
