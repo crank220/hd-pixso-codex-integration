@@ -1,0 +1,30 @@
+{
+  "name": "hd-pixso-codex-integration",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Codex + Pixso desktop design workflow with scoped edits and Vue component mappings",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node dist/server.js",
+    "build": "node scripts/build.js",
+    "test": "node --test tests/*.test.js",
+    "check": "npm test && npm run build && node scripts/validate-package.js",
+    "doctor": "node scripts/doctor.js",
+    "smoke:live": "node scripts/smoke-live.js",
+    "package": "npm run check && node scripts/package.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.32.2",
+    "yaml": "^2.9.1",
+    "zod": "4.6.7"
+  },
+  "devDependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "3.0.1",
+    "esbuild": "0.27.0"
+  }
+}

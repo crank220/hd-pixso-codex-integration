@@ -1,0 +1,7 @@
+node_modules/
+artifacts/
+.pixso-codex.local.json
+*.log
+.DS_Store
+.env*
+!.env.example

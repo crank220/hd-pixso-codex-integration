@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "tokens": { "colorPrimary": "#286BFF", "borderRadius": 6, "fontSize": 14, "controlHeight": 32 },
+  "annotation": { "documentName": "UI/UX设计标注系统" },
+  "mappings": [
+    {
+      "semantic": "table",
+      "provider": "project",
+      "code": { "name": "BusinessTable", "importFrom": "@/components/BusinessTable.vue" }
+    },
+    {
+      "semantic": "select",
+      "provider": "ant-design-vue",
+      "code": { "name": "a-select", "importFrom": "ant-design-vue" }
+    }
+  ]
+}

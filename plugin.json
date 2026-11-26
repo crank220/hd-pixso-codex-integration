@@ -1,0 +1,26 @@
+{
+  "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+  "name": "hd-pixso-codex",
+  "version": "0.1.0",
+  "description": "在 Codex 输入需求，在 Pixso 查看与编辑结果；支持页面范围锁定、组件复用和 Vue 组件映射。",
+  "author": { "name": "crank220", "url": "https://github.com/crank220" },
+  "repository": "https://github.com/crank220/hd-pixso-codex-integration",
+  "license": "MIT",
+  "keywords": ["pixso", "codex", "vue", "ant-design-vue", "design"],
+  "extensions": {
+    "com.openai": {
+      "interface": {
+        "displayName": "Codex + Pixso 双窗口设计",
+        "shortDescription": "用公司组件与规范，在指定 Pixso 页面完成可编辑设计",
+        "longDescription": "设计师在 Codex 描述需求，在 Pixso 查看与调整。复用项目已有组件，按 Vue 与 Ant Design Vue 版本建立映射，通过页面范围与快照检查保护手动修改。需要同机运行 Pixso Desktop MCP 与 Node.js 20+。",
+        "developerName": "crank220",
+        "category": "Creativity",
+        "capabilities": ["Read", "Write", "Interactive"],
+        "defaultPrompt": ["读取当前 Pixso 页面和项目组件，只修改我指定的页面。", "给任务列表增加图片、视频类型，优先复用已有组件，并检查交互标注。"],
+        "brandColor": "#286BFF",
+        "composerIcon": "./assets/icon.svg",
+        "logo": "./assets/icon.svg"
+      }
+    }
+  }
+}
