@@ -1,7 +1,7 @@
 import { build } from 'esbuild';
 import { readFile, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
-const result = await build({ entryPoints: ['src/server.js','src/doctor.js'], outdir: 'dist', bundle: true, platform: 'node', format: 'esm', target: 'node20', packages: 'bundle', metafile: true, legalComments: 'external',
+const result = await build({ entryPoints: ['src/server.js','src/doctor.js','src/login.js'], outdir: 'dist', bundle: true, platform: 'node', format: 'esm', target: 'node20', packages: 'bundle', metafile: true, legalComments: 'external',
  banner: { js: 'import { createRequire as __createRequire } from "node:module"; const require = __createRequire(import.meta.url);' }, minify: false });
 const dirs = [...new Set(Object.keys(result.metafile.inputs).filter(p => p.startsWith('node_modules/')).map(p => {
  const parts = p.split('/'); return parts[1].startsWith('@') ? parts.slice(0,3).join('/') : parts.slice(0,2).join('/');

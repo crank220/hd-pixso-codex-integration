@@ -1,6 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
-const client = new Client({ name: 'hd-pixso-live-read', version: '0.1.1' });
+const client = new Client({ name: 'hd-pixso-live-read', version: '0.2.0' });
 try {
  await client.connect(new StdioClientTransport({ command: process.execPath, args: ['dist/server.js'], stderr: 'inherit' }));
  const result = await client.callTool({ name: 'pixso_status', arguments: {} });

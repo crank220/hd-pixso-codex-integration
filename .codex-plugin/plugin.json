@@ -1,15 +1,21 @@
 {
   "name": "hd-pixso-codex",
-  "version": "0.1.1",
-  "description": "Codex 输入需求、Pixso 查看和编辑结果的双窗口设计插件。",
-  "author": { "name": "crank220" },
+  "version": "0.2.0",
+  "description": "本地/远程 Pixso 设计、UI/UX Pro Max 图层精修与公司标注。",
+  "author": {
+    "name": "crank220"
+  },
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
     "displayName": "Codex + Pixso 双窗口设计",
     "shortDescription": "复用已有组件，只修改指定 Pixso 页面",
     "category": "Creativity",
-    "capabilities": ["Read", "Write", "Interactive"],
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
     "composerIcon": "./assets/icon.svg",
     "logo": "./assets/icon.svg"
   }

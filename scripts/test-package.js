@@ -12,8 +12,10 @@ try {
  const root = join(temp,'hd-pixso-codex');
  await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(root,'dist/server.js')], cwd: root, stderr: 'inherit' }));
  const tools = await client.listTools();
- if (tools.tools.length !== 10) throw Error('Incomplete package tool inventory');
+ if (tools.tools.length !== 11) throw Error('Incomplete package tool inventory');
  const result = await client.callTool({ name: 'resolve_vue_component', arguments: { semantic: 'table' } });
  if (result.isError || result.structuredContent.code.name !== 'a-table') throw Error('Packaged component resolver failed');
- console.log('Extracted ZIP starts standalone without node_modules; 10 tools and component resolution verified');
+ const search=JSON.parse(execFileSync(process.env.PYTHON||'python3',[join(root,'skills/hd-design/vendor/ui-ux-pro-max/scripts/search.py'),'active selected state','--domain','ux','--json'],{encoding:'utf8',cwd:temp}));
+ if(search.domain!=='ux'||!search.results?.length)throw Error('Packaged UI/UX search failed outside repository');
+ console.log('Extracted ZIP starts standalone without node_modules; 11 tools, component resolution and bundled UI/UX search verified');
 } finally { await client.close(); await rm(temp, { recursive: true, force: true }); }

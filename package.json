@@ -1,9 +1,9 @@
 {
   "name": "hd-pixso-codex-integration",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
-  "description": "Codex + Pixso desktop design workflow with scoped edits and Vue component mappings",
+  "description": "Scoped local and remote Pixso design with UI/UX Pro Max precision review",
   "engines": {
     "node": ">=20"
   },
@@ -15,7 +15,9 @@
     "check": "npm test && npm run build && node scripts/validate-package.js",
     "doctor": "node scripts/doctor.js",
     "smoke:live": "node scripts/smoke-live.js",
-    "package": "npm run check && node scripts/package.js"
+    "package": "npm run check && node scripts/package.js",
+    "login:remote": "node dist/login.js",
+    "test:design": "python3 skills/hd-design/vendor/ui-ux-pro-max/scripts/search.py \"active selected state\" --domain ux -n 3"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "1.32.2",

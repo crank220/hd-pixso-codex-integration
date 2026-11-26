@@ -63,3 +63,10 @@ test('confirmed mappings allow the matching component and reject a renamed sourc
   await assert.rejects(service.patch({ scopeToken: s.scopeToken, expectedRevision: result.revision, projectRoot: dir, operations: [{ ...op, key: 'wrong' }] }), /MAPPING_COMPONENT_MISMATCH/);
  } finally { await rm(dir, { recursive: true, force: true }); }
 });
+
+test('local page changes during font loading still reject before any mutation',async()=>{
+ const {p,upstream}=api(),service=new DesignService(upstream),s=await service.begin({});
+ p.loadFontAsync=async()=>{p.currentPage=p.getNodeById('2:1');};
+ await assert.rejects(service.patch({scopeToken:s.scopeToken,expectedRevision:s.revision,operations:[{op:'update',nodeId:'1:3',props:{text:'must not apply'}}]}),/PAGE_CHANGED/);
+ assert.equal(p.getNodeById('1:3').characters,'模版');
+});

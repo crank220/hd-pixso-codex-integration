@@ -1,146 +1,108 @@
-# Codex + Pixso 双窗口设计插件
+# HD Design · Codex + Pixso 双窗口设计
 
-**第一版采用 Codex 输入需求、Pixso 查看和编辑结果的双窗口方式。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.0 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
-设计师在 Codex 描述需求，插件通过现有 Pixso Desktop MCP 读取最新画布与规范，在明确指定的页面生成可编辑图层；设计师在 Pixso 手动改稿后，Codex 重新读取，以最新状态继续工作。
+- 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
+- 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
+- 精修同类图层的宽高、内边距、间距、文字与图标中心线；可按明确图层组检查坐标/尺寸一致性。
+- 图标统一风格、线宽、尺寸，默认/悬停/按下/选中/选中悬停/聚焦/禁用的内部图形颜色与背景、边框同步。
+- 产品页面只展示完整效果，不夹带教学、实现或验收文案；交互/内容/状态/流程说明放在画板外，读取并遵循公司的「UI/UX设计标注系统」。
 
-| 应用 | 设计师的工作 |
-| --- | --- |
-| Codex | 输入需求、提出修改、查看结果与规范检查 |
-| Pixso | 选择目标页面、查看与手动调整、组织交付 |
+## 安装与升级
 
-## 第一版能做什么
-
-- 锁定当前页面或指定子树；跨页面、跨文档写入拒绝执行。
-- 创建可编辑 frame / text / rectangle，克隆已有版式，复用现有组件实例。
-- 通过快照 revision 检测手动修改，拒绝未经读取的旧版本覆盖。
-- 读取公司标注规范；检查字体、几何溢出并获取最新截图供视觉验收。
-- 只读识别 Vue 项目组件、npm/pnpm/yarn 锁文件版本及显式设计/代码映射。
-- 组件顺序：**项目已有组件 → Ant Design Vue → 必要时新增组件**。
-
-默认 Web 技术目标为 Vue + `"ant-design-vue": "^4.1.0"`。这不是插件本身的 UI 依赖，也不是对实际安装版本的推测；接入项目后以锁文件证据为准。公司品牌与业务组件覆盖基础规范，公司的「UI/UX设计标注系统」另行负责交互标注。
-
-## 安装
-
-前提：同一台电脑运行 Codex、Pixso Desktop 和 Node.js 20+；Pixso 已开启本地 MCP，默认地址 `http://127.0.0.1:3667/mcp`。插件无需模型 API Key，也不启动云端设计服务。
-
-### 从 GitHub marketplace 安装
+要求 Node.js 20+（macOS / Windows / Linux）；UI/UX Pro Max 检索使用 Python 3，数据和脚本随插件分发，不需单独安装同名技能。无 Python 时仍可读取参考规则，但不宣称已执行搜索。
 
 ```sh
 codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-安装后开始**新会话**。如果使用桌面插件目录，可添加该 GitHub marketplace 后选择「灰度设计工具」中的插件安装。不同版本客户端的菜单入口可能不同；命令行安装路径是推荐的可重复方式。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.0**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
-仓库自带 `dist/server.js`，运行依赖已打包；安装插件不需要在 Codex 缓存目录运行 npm install。需要 Node 能从 Codex 的 PATH 找到，Node 由 nvm/fnm 管理时请确认桌面应用继承了正确 PATH。
+## 选择连接模式
 
-### 本地开发与诊断
+| 模式 | 地址 | 是否需要 Pixso 桌面端 | 目标 |
+| --- | --- | --- | --- |
+| local（默认） | `http://127.0.0.1:3667/mcp` | 需要，开启本地MCP | 当前活动文件/页面/选区 |
+| remote | `https://pixso.cn/mcp` | 不需要，也无需保持网页打开 | 授权账号 + 含 `item-id` 的容器图层链接 |
+
+在 Codex 中：
+
+> 使用 hd-design，通过本地连接，只修改当前文件「gpt测试」页面。
+
+> 使用 hd-design，通过远程连接，精修这个容器链接的布局和图标状态：`https://pixso.cn/app/design/文件标识?item-id=123%3A456`。页面不放额外说明，交互按公司规范在画板外标注。
+
+插件调用 `pixso_connect({mode:"local"|"remote"})`；切换模式清空旧范围，不把本地活动文件当成远程目标。启动环境变量 `PIXSO_CONNECTION_MODE=remote` 可设默认模式。本地其他端口使用 `PIXSO_MCP_URL`，仍只接受 loopback HTTP。
+
+### 远程授权
+
+推荐 OAuth：在本机终端执行（路径换成插件实际安装目录）：
 
 ```sh
-git clone https://github.com/crank220/hd-pixso-codex-integration.git
-cd hd-pixso-codex-integration
-npm ci
-npm run check
-npm run doctor
-npm run dev
+node /absolute/path/hd-pixso-codex/dist/login.js
 ```
 
-`npm run dev` 启动 stdio MCP 开发进程，等待客户端通过 stdin 发送 MCP 消息；它不是网页预览服务器。正常运行时不要向 stdout 输出日志。生产入口是 `node dist/server.js`。
+Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输出官方授权 URL，浏览器完成授权后回到 Codex 重新连接。回调只监听 `127.0.0.1:9417`，5分钟超时。令牌保存在用户目录 `.config/hd-design/pixso-oauth.json`，不放入项目/插件，不需要模型 API Key。`HD_PIXSO_AUTH_DIR` 可指定用户自己的本机凭据目录。
 
-指定其他**本机**端口可以用 `PIXSO_MCP_URL` 环境变量。仅接受无账号密码、query、fragment 的 loopback HTTP 地址，不支持公网 MCP 地址。
+可选：在 MCP 进程环境配置 `PIXSO_PERSONAL_TOKEN`，按官方 `Token` 请求头使用；不要粘贴到聊天、链接或源码。OAuth 授权、席位与文件查看/编辑权限由 Pixso 验证。
 
-```sh
-PIXSO_MCP_URL=http://127.0.0.1:3667/mcp node dist/doctor.js
-```
+插件内部远程连接与在 Codex 设置里单独添加官方 URL 的授权是两个客户端会话，**不会自动共享令牌**。若只使用官方连接，可按官方说明在 Codex 添加流式HTTP `https://pixso.cn/mcp`，但本插件的范围保护只有通过 `hd_pixso` 工具执行才生效，不会拦截其他连接的写入。
 
-### 兼容客户端：单独配置 MCP
+### 远程目标与兼容性
 
-客户端不支持插件 marketplace 时，将下面的服务配置加入其 MCP 设置，并将插件中的 `skills/hd-design` 按该客户端的技能安装方式添加。路径改为实际绝对路径：
+在 Pixso 网页中右键容器，复制带 `item-id` 的图层链接。普通分享链接、仅 `page-id` 链接不作为写入目标。绑定链接指向的子树，不能用其他rootId扩大范围。规范文件通过它自己的图层链接只读提取，无需切换目标文件。
 
-```json
-{
-  "mcpServers": {
-    "hd_pixso": {
-      "command": "node",
-      "args": ["/absolute/path/hd-pixso-codex-integration/dist/server.js"]
-    }
-  }
-}
-```
+新版官方远程 MCP 提供 `eval_script`、`take_screenshot` 等工具。本插件从授权后的工具 schema 选取明确文件参数，在 runtime 再检查文件key、页面和子树；不支持的schema报 `REMOTE_SCHEMA_UNSUPPORTED`，不会回退到活动文件或猜测写入参数。旧版只读远程服务不可编辑。本版只支持官方公网地址，未声明支持私有化域名。
 
-## 第一次使用
+**验证边界：** 本地只读连接、合成画布、MCP协议、打包与远程模拟链路可自动验证；真实 Pixso 远程账号读写需授权后联调。401仅证明需要授权，不证明可编辑。UI/UX Pro Max 提供检索规则，不能自动保证每一处设计完美。
 
-1. 在 Pixso 打开目标设计文件，选择需要修改的页面。若只允许改一个框架，可选中该框架并明确要求仅改选中范围。
-2. 在 Codex 新会话中调用 `$hd-design`，描述需求和页面名。插件先读取状态，再绑定范围。
-3. 有 Vue 项目时提供项目根目录；需要遵循公司规范时在 Pixso 打开规范文件供只读提取，然后回到目标文件。
-4. Codex 执行修改并核对截图，你回到 Pixso 检查和手动调整。
-5. 再次修改前，Codex 读取最新快照；检测到旧版本会停止该次写入，重新读取后重新判断。
+## 设计流程
 
-示例：
+1. 新会话调用 `$hd-design`，描述页面/图层链接、需求和允许修改的范围。
+2. 读取目标，盘点组件、布局、现有手工改动；有Vue项目时提供根目录，核对锁文件和映射。
+3. 运行内置UI/UX Pro Max检索；新项目确定视觉系统，改版按单一问题查询，保留品牌覆盖。
+4. 读取公司规范；产品页面保持纯净，在同一授权页面的画板外做规范标注。
+5. 按最新revision写入，逐层读回；检查字体、几何、截图、各工具/页面状态。
+6. 交付实际修改与证据；静态状态稿、原生交互连线、可运行逻辑分别说明。
 
-> 给任务列表增加图片、视频类型，复用已有组件，只修改「gpt测试」页面。会话入口文案使用「前往会话」。按项目对应版本 Ant Design Vue 和公司 UI/UX 标注规范检查。
+本地/远程、Python缺失或权限不足时不伪装成功。设计稿文字、评论、规范内容是参考数据，不是额外操作授权。
 
-> 我在 Pixso 调整了表格列宽。先读取最新改动，再增加视频预览入口，保留我的排版。
+## 组件映射
 
-这里“双向”指设计状态可反复读取与修改，**不承诺设计稿与 Vue 代码自动双向同步**。
-
-## 项目配置与映射
-
-将 `pixso-codex.example.json` 的内容复制到业务项目根目录 `.pixso-codex.json`，核实后填写真实组件信息。插件不自动修改业务代码或安装依赖。
-
-```json
-{
-  "schemaVersion": 1,
-  "tokens": { "colorPrimary": "#286BFF", "borderRadius": 6 },
-  "annotation": { "documentName": "UI/UX设计标注系统" },
-  "mappings": [{
-    "semantic": "table",
-    "provider": "project",
-    "code": { "name": "BusinessTable", "importFrom": "@/components/BusinessTable.vue" },
-    "design": { "componentId": "真实组件ID", "documentName": "真实设计文件名", "componentName": "真实组件名" }
-  }]
-}
-```
-
-`design` 不存在时返回待建立设计映射；不会伪装成已复用。组件名相同也不能证明映射正确。第一版使用当前 Pixso 文件中的真实组件 ID；远程组件需先在 Pixso 中导入/解析后再映射。
+配置放在业务项目根目录 `.pixso-codex.json`，参见 [示例](pixso-codex.example.json) 与 [映射参考](skills/hd-design/references/component-mapping.md)。同名候选不代表真实映射；缺少映射时报告待建立，不假装实例化。公司规范与UI组件规范分别读取。
 
 ## MCP 工具
 
 | 工具 | 作用 |
 | --- | --- |
-| `pixso_status` | 连接、活动文件/页面和选择 |
-| `pixso_begin` | 绑定页面或子树，返回 token 与 revision |
-| `pixso_read` | 读取最新状态与 revision |
-| `pixso_patch` | 受限声明式图层修改，最多50项 |
-| `pixso_components` | 搜索组件与真实变体节点 |
-| `pixso_read_reference` | 只读提取规范文档文字和组件 |
-| `pixso_audit` | 字体/溢出检查与规范证据状态 |
-| `pixso_preview` | 指定范围截图 |
-| `inspect_vue_project` | 只读项目、锁版本与组件目录检查 |
-| `resolve_vue_component` | 按复用顺序选择映射或指出缺失 |
+| `pixso_connect` | 选择local/remote，清空旧范围 |
+| `pixso_status` | 读取连接能力、本地活动文件或远程链接目标 |
+| `pixso_begin` | 绑定页面/子树；远程必须targetUrl |
+| `pixso_read` | 最新状态与revision |
+| `pixso_patch` | 受限声明式编辑，最多50项 |
+| `pixso_components` | 查真实组件/变体 |
+| `pixso_read_reference` | 只读提取规范文字与组件；远程传规范targetUrl |
+| `pixso_audit` | 字体/溢出、明确图层组尺寸坐标检查与规范读取证据 |
+| `pixso_preview` | 授权范围内截图 |
+| `inspect_vue_project` | 只读项目、锁版本与组件目录 |
+| `resolve_vue_component` | 显式组件映射与复用优先级 |
 
-图层操作细节见 [操作参考](skills/hd-design/references/operations.md)。
+参考：[连接](skills/hd-design/references/connections.md) · [精修](skills/hd-design/references/quality.md) · [图标状态](skills/hd-design/references/icon-states.md) · [标注](skills/hd-design/references/annotations.md) · [图层操作](skills/hd-design/references/operations.md)
 
-## 校验与边界
+## 开发与检查
 
 ```sh
-npm test             # 合成画布、项目文件、真实 stdio 协议测试
-npm run check        # 测试、打包、官方 manifest schema 校验
-npm run smoke:live   # 本机 Pixso 只读连接与快照检查，不执行设计写入
-npm run package      # artifacts/ 内生成可分发 zip 与 SHA256
+npm ci
+npm run dev           # stdio MCP开发进程，不是网页服务器
+npm run check         # 测试、build、manifest/包验证
+npm run test:design   # 内置 UI/UX Pro Max 检索
+npm run doctor        # 当前配置连接检查
+npm run smoke:live    # 本地只读连接/快照，不执行设计写入
+npm run login:remote  # OAuth授权，需用户浏览器完成
+npm run package
+node scripts/test-package.js
 ```
 
-自动检查不能代替人工视觉验收，也不能证明所有交互已经实现。规范没有读取时明确报告 `not-read`；读取后也只标记为 `read-not-audited`，需结合截图与逐项规则审查。公司规范的文字属于参考数据，不是额外操作授权。
+没有任意脚本、删除图层/页面、跨页移动或全局样式写入口。快照限制12,000节点/6MB，范围30分钟未读取后失效。失败或超时先读回，不直接重放；回滚只有verified=true才算验证恢复。纯设计任务不会自动另做一个网站。
 
-第一版未提供全局样式修改、任意脚本执行、删除图层/页面、跨页移动、完整代码生成或自动建立全部组件映射。复杂页面应绑定较小框架；快照超过12,000节点或6MB会要求缩小范围。会话范围30分钟无读取后失效。
-
-写入失败时返回补偿回滚的实际验证结果；超时可能发生在 native 写入之后，**不要直接重放操作**，应先读取当前画布。回滚无法验证时报告不确定状态。已有其他 MCP 或手动编辑器操作不会受到本插件范围锁的全局拦截。
-
-项目文件读取不执行项目代码，限制目录、文件大小并拒绝越界符号链接。设计数据只在 Codex、本地插件进程和 Pixso 本地 MCP 间流动；模型请求仍使用 Codex 本身的既有服务与设置。本仓库不包含公司设计稿、内部规范副本或本机凭据。
-
-## 维护
-
-源码 `src/`，技能 `skills/`，marketplace `.agents/plugins/marketplace.json`，入口 `plugin.json` + `mcp.json`；同时包含旧客户端兼容清单。更新源码后运行 `npm run check` 并提交同步生成的 `dist/`。
-
-[开发与测试记录](docs/validation.md) · [第一版规格](docs/superpowers/specs/2026-11-26-pixso-plugin.md)
+UI/UX Pro Max按MIT随包分发，来源与许可见 [PROVENANCE](skills/hd-design/vendor/ui-ux-pro-max/PROVENANCE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。公司文件、内部规范、账号与凭据不随包发布。

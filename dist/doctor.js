@@ -17336,6 +17336,122 @@ var Client = class extends Protocol {
   }
 };
 
+// src/oauth.js
+import { mkdir, readFile, writeFile, rename, chmod } from "node:fs/promises";
+import { join } from "node:path";
+import { homedir } from "node:os";
+import { randomBytes } from "node:crypto";
+var AUTH_HELP = "REMOTE_AUTH_REQUIRED: run node <plugin-root>/dist/login.js to authorize Pixso, then retry; or set PIXSO_PERSONAL_TOKEN in the MCP server environment";
+var PixsoOAuthProvider = class {
+  constructor({ directory = process.env.HD_PIXSO_AUTH_DIR || join(homedir(), ".config", "hd-design"), redirectUrl = "http://127.0.0.1:9417/callback", onRedirect } = {}) {
+    this.directory = directory;
+    this.file = join(directory, "pixso-oauth.json");
+    this._redirectUrl = redirectUrl;
+    this.onRedirect = onRedirect;
+    this.nonce = randomBytes(32).toString("base64url");
+  }
+  get redirectUrl() {
+    return this._redirectUrl;
+  }
+  get clientMetadata() {
+    return { client_name: "HD Design", redirect_uris: [this.redirectUrl], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none", scope: "mcp:connect" };
+  }
+  state() {
+    return this.nonce;
+  }
+  async read() {
+    try {
+      const s = JSON.parse(await readFile(this.file, "utf8"));
+      return s.endpoint === "https://pixso.cn/mcp" ? s : {};
+    } catch (e) {
+      if (e.code === "ENOENT") return {};
+      throw Error("OAUTH_STORE_UNREADABLE: repair the local credential store");
+    }
+  }
+  async save(key, value) {
+    const data = await this.read();
+    await mkdir(this.directory, { recursive: true, mode: 448 });
+    const temp = join(this.directory, `oauth-${randomBytes(12).toString("hex")}.tmp`);
+    await writeFile(temp, JSON.stringify({ ...data, endpoint: "https://pixso.cn/mcp", [key]: value }), { mode: 384, flag: "wx" });
+    await rename(temp, this.file);
+    await chmod(this.file, 384);
+  }
+  async clientInformation() {
+    return (await this.read()).client;
+  }
+  async saveClientInformation(value) {
+    await this.save("client", value);
+  }
+  async tokens() {
+    const d = await this.read();
+    if (d.expiresAt && Date.now() >= d.expiresAt) return d.tokens ? { ...d.tokens, expires_in: 0 } : void 0;
+    return d.tokens;
+  }
+  async saveTokens(value) {
+    await this.save("tokens", value);
+    await this.save("expiresAt", value.expires_in ? Date.now() + value.expires_in * 1e3 : null);
+  }
+  async redirectToAuthorization(url2) {
+    if (!this.onRedirect) throw Error(AUTH_HELP);
+    await this.onRedirect(url2);
+  }
+  saveCodeVerifier(value) {
+    this.verifier = value;
+  }
+  codeVerifier() {
+    if (!this.verifier) throw Error("OAUTH_VERIFIER_MISSING");
+    return this.verifier;
+  }
+  async invalidateCredentials(scope) {
+    if (scope === "verifier") {
+      this.verifier = void 0;
+      return;
+    }
+    if (scope === "all" || scope === "client") await this.save("client", void 0);
+    if (scope === "all" || scope === "tokens") {
+      await this.save("tokens", void 0);
+      await this.save("expiresAt", null);
+    }
+  }
+};
+
+// src/connection.js
+var LOCAL_ENDPOINT = "http://127.0.0.1:3667/mcp";
+var REMOTE_ENDPOINT = "https://pixso.cn/mcp";
+function validateRemoteEndpoint(value = REMOTE_ENDPOINT) {
+  const u = new URL(value);
+  if (u.origin !== "https://pixso.cn" || u.pathname !== "/mcp" || u.username || u.password || u.search || u.hash)
+    throw Error("INVALID_REMOTE_ENDPOINT: use https://pixso.cn/mcp");
+  return u;
+}
+function parseLayerLink(value) {
+  let u;
+  try {
+    u = new URL(value);
+  } catch {
+    throw Error("LAYER_LINK_REQUIRED: copy the container link with item-id");
+  }
+  const match = u.pathname.match(/^\/app\/design\/([A-Za-z0-9_-]+)\/?$/);
+  const ids = u.searchParams.getAll("item-id");
+  if (u.origin !== "https://pixso.cn" || u.username || u.password || u.hash || !match || ids.length !== 1 || !/^\d+:\d+$/.test(ids[0]))
+    throw Error("LAYER_LINK_REQUIRED: expected https://pixso.cn/app/design/<fileKey>?item-id=<nodeId>; page-id/share links are insufficient");
+  return { fileKey: match[1], nodeId: ids[0], url: `https://pixso.cn/app/design/${match[1]}?item-id=${encodeURIComponent(ids[0])}` };
+}
+function remoteToolArguments(tool, target, payload = {}) {
+  if (!tool?.inputSchema) throw Error("REMOTE_TOOL_UNAVAILABLE");
+  const props = tool.inputSchema.properties || {}, args = {};
+  const isString = (s) => s?.type === "string" || s?.anyOf?.some(isString) || s?.oneOf?.some(isString);
+  const selector = ["fileUrl", "file_url", "url", "fileKey", "file_key", "fileId", "file_id"].find((k) => isString(props[k]));
+  if (!selector) throw Error(`REMOTE_SCHEMA_UNSUPPORTED: ${tool.name} has no explicit file selector; no write was sent`);
+  args[selector] = /url/i.test(selector) ? target.url : target.fileKey;
+  for (const [k, v] of Object.entries(payload)) {
+    if (!props[k]) throw Error(`REMOTE_SCHEMA_UNSUPPORTED: ${tool.name}.${k}`);
+    args[k] = v;
+  }
+  for (const key of tool.inputSchema.required || []) if (!(key in args)) throw Error(`REMOTE_SCHEMA_UNSUPPORTED: missing required ${tool.name}.${key}`);
+  return args;
+}
+
 // node_modules/@modelcontextprotocol/sdk/dist/esm/shared/mediaType.js
 var import_content_type = __toESM(require_content_type(), 1);
 function mediaTypeEssence(header) {
@@ -17455,8 +17571,8 @@ async function random(size) {
   const evenDistCutoff = Math.pow(2, 8) - Math.pow(2, 8) % mask.length;
   let result = "";
   while (result.length < size) {
-    const randomBytes = await getRandomValues(size - result.length);
-    for (const randomByte of randomBytes) {
+    const randomBytes2 = await getRandomValues(size - result.length);
+    for (const randomByte of randomBytes2) {
       if (randomByte < evenDistCutoff) {
         result += mask[randomByte % mask.length];
       }
@@ -18982,25 +19098,38 @@ function parseToolResult(result) {
   return value;
 }
 var PixsoUpstream = class {
-  constructor(endpoint = "http://127.0.0.1:3667/mcp") {
-    this.url = validateEndpoint(endpoint);
+  constructor(endpoint = LOCAL_ENDPOINT, { mode = "local", personalToken, authProvider } = {}) {
+    if (!["local", "remote"].includes(mode)) throw Error("INVALID_CONNECTION_MODE");
+    this.mode = mode;
+    this.url = mode === "remote" ? validateRemoteEndpoint(endpoint) : validateEndpoint(endpoint);
+    this.personalToken = personalToken;
+    this.authProvider = mode === "remote" && !personalToken ? authProvider || new PixsoOAuthProvider() : void 0;
   }
   async connect() {
     if (this.client) return this.client;
     if (this.connecting) return this.connecting;
     this.connecting = (async () => {
-      const client = new Client({ name: "hd-pixso-codex", version: "0.1.1" });
-      const transport = new StreamableHTTPClientTransport(this.url, { fetch: (url2, init) => fetch(url2, { ...init, redirect: "error" }) });
+      const client = new Client({ name: "hd-pixso-codex", version: "0.2.0" });
+      const transport = new StreamableHTTPClientTransport(this.url, { authProvider: this.authProvider, ...this.personalToken ? { requestInit: { headers: { Token: this.personalToken } } } : {}, fetch: (url2, init) => fetch(url2, { ...init, redirect: "error" }) });
       try {
         await client.connect(transport, { timeout: 1e4 });
-        const tools = await client.listTools({}, { timeout: 1e4 });
-        if (!tools.tools.some((t) => t.name === "eval_script")) throw Error("PIXSO_EVAL_UNAVAILABLE: upgrade or enable Pixso Desktop MCP");
+        const inventory = [];
+        let cursor;
+        do {
+          const batch = await client.listTools(cursor ? { cursor } : {}, { timeout: 1e4 });
+          inventory.push(...batch.tools);
+          cursor = batch.nextCursor;
+        } while (cursor);
+        const tools = { tools: inventory };
+        if (!tools.tools.some((t) => t.name === "eval_script")) throw Error("PIXSO_EVAL_UNAVAILABLE: connected server must provide editable eval_script capability");
+        this.toolSchemas = new Map(tools.tools.map((t) => [t.name, t]));
         this.toolNames = new Set(tools.tools.map((t) => t.name));
         this.client = client;
         return client;
       } catch (e) {
         await client.close().catch(() => {
         });
+        if (this.mode === "remote" && /401|Unauthorized/.test(e.message)) throw Error(AUTH_HELP);
         throw e;
       } finally {
         this.connecting = null;
@@ -19013,22 +19142,43 @@ var PixsoUpstream = class {
     if (!this.toolNames.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
     return client.callTool({ name, arguments: args }, void 0, { timeout: 6e4 });
   }
-  async evaluate(script) {
-    return parseToolResult(await this.call("eval_script", { script }));
+  async evaluate(script, target) {
+    if (this.mode !== "remote") return parseToolResult(await this.call("eval_script", { script }));
+    const t = typeof target === "string" ? parseLayerLink(target) : target;
+    if (!t) throw Error("LAYER_LINK_REQUIRED");
+    await this.connect();
+    return parseToolResult(await this.call("eval_script", remoteToolArguments(this.toolSchemas.get("eval_script"), t, { script })));
+  }
+  async info() {
+    await this.connect();
+    return this.toolNames.has("get_mcp_server_info") ? parseToolResult(await this.call("get_mcp_server_info")) : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolNames] };
+  }
+  async screenshot(target, nodeId) {
+    if (this.mode !== "remote") return this.call("get_screenshot", { guid: nodeId });
+    await this.connect();
+    const tool = this.toolSchemas.get("take_screenshot");
+    if (!tool) throw Error("REMOTE_SCREENSHOT_UNAVAILABLE");
+    const props = tool.inputSchema.properties || {};
+    const payload = props.nodeId ? { nodeId } : props.nodeIds ? { nodeIds: [nodeId] } : props.guid ? { guid: nodeId } : null;
+    if (!payload) throw Error("REMOTE_SCHEMA_UNSUPPORTED: screenshot node selector");
+    return this.call("take_screenshot", remoteToolArguments(tool, target, payload));
   }
   async close() {
     if (this.client) await this.client.close();
     this.client = null;
   }
 };
+function createUpstream(mode = process.env.PIXSO_CONNECTION_MODE || "local") {
+  return new PixsoUpstream(mode === "remote" ? REMOTE_ENDPOINT : process.env.PIXSO_MCP_URL || LOCAL_ENDPOINT, { mode, personalToken: mode === "remote" ? process.env.PIXSO_PERSONAL_TOKEN : void 0 });
+}
 
 // src/doctor.js
-var upstream = new PixsoUpstream(process.env.PIXSO_MCP_URL || "http://127.0.0.1:3667/mcp");
+var upstream = createUpstream();
 try {
-  const result = parseToolResult(await upstream.call("get_mcp_server_info"));
-  console.log(JSON.stringify({ ok: true, node: process.version, pixso: result, next: "\u5728 Pixso \u9009\u62E9\u76EE\u6807\u9875\u9762\uFF0C\u7136\u540E\u5728\u65B0 Codex \u4F1A\u8BDD\u4E2D\u4F7F\u7528 hd-design\u3002" }, null, 2));
+  const result = await upstream.info();
+  console.log(JSON.stringify({ ok: true, mode: upstream.mode, node: process.version, pixso: result, next: "\u5728 Pixso \u9009\u62E9\u76EE\u6807\u9875\u9762\uFF0C\u7136\u540E\u5728\u65B0 Codex \u4F1A\u8BDD\u4E2D\u4F7F\u7528 hd-design\u3002" }, null, 2));
 } catch (e) {
-  console.error(JSON.stringify({ ok: false, error: e.message, next: "\u786E\u8BA4 Pixso \u5DF2\u542F\u52A8\u3001\u672C\u5730 MCP \u5DF2\u5F00\u542F\uFF0C\u9ED8\u8BA4\u5730\u5740\u4E3A http://127.0.0.1:3667/mcp\u3002" }, null, 2));
+  console.error(JSON.stringify({ ok: false, error: e.message, next: upstream.mode === "remote" ? "\u5148\u6267\u884C node dist/login.js \u5B8C\u6210\u5B98\u65B9OAuth\u6388\u6743\uFF1B\u8FDC\u7A0B\u9700\u6709\u6548\u56FE\u5C42\u94FE\u63A5\u3002" : "\u786E\u8BA4 Pixso \u5DF2\u542F\u52A8\u3001\u672C\u5730 MCP \u5DF2\u5F00\u542F\uFF0C\u9ED8\u8BA4\u5730\u5740\u4E3A http://127.0.0.1:3667/mcp\u3002" }, null, 2));
   process.exitCode = 1;
 } finally {
   await upstream.close();

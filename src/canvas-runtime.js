@@ -5,6 +5,10 @@ export async function canvasRuntime(input) {
   const fail = (code, detail = '') => { throw new Error(`${code}: ${detail}`); };
   const identity = () => JSON.stringify([api.fileKey || null, api.root.name, api.root.children.map(p => p.id)]);
   const get = id => api.getNodeById(id);
+  const target=input.remoteTarget;
+  if(target && api.fileKey!==target.fileKey)throw Error('REMOTE_FILE_MISMATCH: explicit link does not match runtime file');
+  let page=api.currentPage;
+  if(target){const n=get(target.nodeId);if(!n)throw Error('REMOTE_NODE_NOT_FOUND');let p=n;while(p&&p.type!=='PAGE')p=p.parent;if(!p)throw Error('REMOTE_PAGE_NOT_FOUND');page=p;}
   const inside = (n, root) => { for (let p = n; p; p = p.parent) if (p.id === root.id) return true; return false; };
   const plain = value => {
     if (typeof value === 'symbol') return 'MIXED';
@@ -35,13 +39,13 @@ export async function canvasRuntime(input) {
   const summarize = n => ({ id: n.id, type: n.type, name: n.name, width: n.width, height: n.height });
   if (input.action === 'inspect') return {
     document: { name: api.root.name, identity: identity() },
-    currentPage: summarize(api.currentPage), selection: api.currentPage.selection.map(summarize),
+    currentPage: summarize(page), selection: target?[]:page.selection.map(summarize),
     pages: api.root.children.map(p => ({ id: p.id, name: p.name, childCount: p.children.length })),
-    frames: api.currentPage.children.slice(0, 120).map(summarize)
+    frames: page.children.slice(0, 120).map(summarize)
   };
   if (input.action === 'standards') {
     if (input.expectedDocumentName && api.root.name !== input.expectedDocumentName) fail('REFERENCE_DOCUMENT_MISMATCH', api.root.name);
-    const root = input.nodeId ? get(input.nodeId) : api.currentPage;
+    const root = input.nodeId ? get(input.nodeId) : page;
     if (!root) fail('NODE_NOT_FOUND');
     const texts = [], components = []; let visited = 0;
     function walk(n, depth) {
@@ -56,7 +60,7 @@ export async function canvasRuntime(input) {
   }
   let scope = input.scope;
   if (input.action === 'open') {
-    const page = api.currentPage;
+
     if (input.pageName && page.name !== input.pageName) fail('PAGE_NAME_MISMATCH', page.name);
     const root = input.rootId ? get(input.rootId) : page;
     if (!root || !inside(root, page)) fail('OUT_OF_SCOPE', 'Target must be on the active page');
@@ -64,9 +68,9 @@ export async function canvasRuntime(input) {
   }
   if (!scope) fail('SCOPE_REQUIRED');
   if (identity() !== scope.documentIdentity) fail('DOCUMENT_CHANGED');
-  if (api.currentPage.id !== scope.pageId) fail('PAGE_CHANGED');
+  if (page.id !== scope.pageId) fail('PAGE_CHANGED');
   const root = get(scope.rootId);
-  if (!root || !inside(root, api.currentPage)) fail('SCOPE_REMOVED');
+  if (!root || !inside(root, page)) fail('SCOPE_REMOVED');
   const before = snapshot(root);
   if (input.action === 'open' || input.action === 'read') return { scope, ...before };
   if (input.action === 'preview') {
@@ -75,7 +79,7 @@ export async function canvasRuntime(input) {
     return { nodeId: n.id };
   }
   if (input.action === 'components') {
-    const source = input.parentId ? get(input.parentId) : api.currentPage;
+    const source = input.parentId ? get(input.parentId) : page;
     if (!source) fail('NODE_NOT_FOUND');
     const components = []; let count = 0;
     function scan(n, depth) {
@@ -102,7 +106,19 @@ export async function canvasRuntime(input) {
       if (n.children) n.children.forEach(walk);
     }
     walk(root);
-    return { scope, nodeCount: before.nodeCount, problems, fonts: [...fonts], visualReviewRequired: true,
+    const checks=[];
+    for(const check of input.checks||[]){
+      if(!Array.isArray(check.nodeIds)||check.nodeIds.length<2||!['x','y','width','height'].includes(check.property))fail('INVALID_LAYOUT_CHECK');
+      const ns=check.nodeIds.map(id=>{const n=get(id);if(!n||!inside(n,root))fail('OUT_OF_SCOPE',id);return n;});
+      if(['x','y'].includes(check.property)&&ns.some(n=>n.parent?.id!==ns[0].parent?.id)){checks.push({...check,status:'review-required',reason:'Position comparison requires the same parent'});continue;}
+      const values=ns.map(n=>({nodeId:n.id,value:n[check.property]}));
+      if(values.some(v=>typeof v.value!=='number'||!Number.isFinite(v.value))){checks.push({...check,status:'review-required',reason:'Property unavailable on a selected node'});continue;}
+      const delta=Math.max(...values.map(v=>v.value))-Math.min(...values.map(v=>v.value));
+      const status=delta<=(check.tolerance??1)?'passed':'mismatch';
+      checks.push({...check,status,delta,values});
+      if(status==='mismatch')problems.push({rule:'inconsistent-'+check.property,nodeIds:check.nodeIds,message:'Declared peer group differs by '+delta+'px'});
+    }
+    return { scope, nodeCount: before.nodeCount, problems, checks, fonts: [...fonts], visualReviewRequired: true,
       limitations: ['Geometry findings require visual review', 'Company annotation compliance requires the referenced standard'] };
   }
   if (input.action !== 'apply') fail('UNKNOWN_ACTION');
@@ -193,7 +209,7 @@ export async function canvasRuntime(input) {
   }
   await Promise.all([...fontSet.values()].map(f => api.loadFontAsync(f)));
   if (identity() !== scope.documentIdentity) fail('DOCUMENT_CHANGED');
-  if (api.currentPage.id !== scope.pageId) fail('PAGE_CHANGED');
+  if ((target ? page.id : api.currentPage.id) !== scope.pageId) fail('PAGE_CHANGED');
   if (snapshot(root).state !== before.state) fail('STALE_REVISION', 'The design changed while loading fonts');
   for (const [id, state] of sourceStates) if (snapshot(get(id)).state !== state) fail('STALE_SOURCE', id);
   aliases.clear();
