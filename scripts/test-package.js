@@ -41,13 +41,23 @@ try {
   if (client.getServerVersion()?.version !== version)
     throw Error('Packaged MCP version differs from package.json');
   const tools = await client.listTools();
-  if (tools.tools.length !== 11) throw Error('Incomplete package tool inventory');
+  if (tools.tools.length !== 12) throw Error('Incomplete package tool inventory');
   const result = await client.callTool({
     name: 'resolve_vue_component',
     arguments: { semantic: 'table' },
   });
   if (result.isError || result.structuredContent.code.name !== 'a-table')
     throw Error('Packaged component resolver failed');
+  const library = await client.callTool({
+    name: 'pixso_library',
+    arguments: { page: 'Button', limit: 1 },
+  });
+  if (
+    library.isError ||
+    library.structuredContent.coverage.pages !== 87 ||
+    !library.structuredContent.families[0]?.familyId
+  )
+    throw Error('Packaged complete library catalog is missing');
   const search = JSON.parse(
     execFileSync(
       process.env.PYTHON || 'python3',
@@ -64,7 +74,7 @@ try {
   if (search.domain !== 'ux' || !search.results?.length)
     throw Error('Packaged UI/UX search failed outside repository');
   console.log(
-    'Extracted ZIP starts standalone without node_modules; 11 tools, component resolution and bundled UI/UX search verified',
+    'Extracted ZIP starts standalone without node_modules; 12 tools, component resolution and bundled UI/UX search verified',
   );
 } finally {
   await client.close();

@@ -66,13 +66,30 @@ $hd-design
 
 ## 插件能力
 
-在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.2.3 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.3.0 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
 - 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
 - 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
 - 精修同类图层的宽高、内边距、间距、文字与图标中心线；可按明确图层组检查坐标/尺寸一致性。
 - 图标统一风格、线宽、尺寸，默认/悬停/按下/选中/选中悬停/聚焦/禁用的内部图形颜色与背景、边框同步。
 - 产品页面只展示完整效果，不夹带教学、实现或验收文案；交互/内容/状态/流程说明放在画板外，读取并遵循公司的「UI/UX设计标注系统」。
+
+## 内置 Ant Design Vue 组件资产
+
+已接入 **Ant Design Vue (Community)** 的全部 **87个页面、1013个组件族、5007个组件及变体**。组件页面、图标、颜色与布局参考、概览和分类分隔页均有记录；无组件主定义的参考页面不会虚报为可实例化组件。资产封面声明版本为 **4.2.3**。
+
+在 Codex 输入：
+
+```text
+$hd-design
+先通过 pixso_library 查询内置组件和变体，优先复用项目已有组件。
+在我指定的目标页面，使用库中的真实按钮、日期选择器和表格组件。
+按需求选择尺寸和状态，文本使用组件原生属性覆盖；保留我已有的修改。
+```
+
+`pixso_library` 可离线查询目录；`pixso_patch` 的 `library-instance` 操作校验真实变体、创建原生实例并读回。纯设计无需配置 Vue 项目；若连接代码项目，继续优先复用业务组件。详见[资产使用与示例](skills/hd-design/references/library.md)。
+
+**接入边界：** 包内是资产目录与绑定信息，完整可编辑组件由 Pixso 原生库提供。同源文件可以按真实组件创建实例；跨文件导入要求组件已发布且账号有访问权限。采集时组件页抽样均为 `UNPUBLISHED`，需先在 Pixso 发布并开放给使用者后才能跨文件导入。目录覆盖不等于已完成所有变体的真实导入验证；不会自动发布或改动源库。主题自动同步、全部组件 API 核验不属于本次资产接入。
 
 ## 安装与升级
 
@@ -83,7 +100,7 @@ codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-已安装用户在 Codex 插件管理中刷新来源、更新至 **0.2.3**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.3.0**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
 ## 选择连接模式
 
@@ -145,7 +162,8 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 | `pixso_status` | 读取连接能力、本地活动文件或远程链接目标 |
 | `pixso_begin` | 本地按唯一 pageName 绑定页面/子树，缺省活动页；远程必须targetUrl |
 | `pixso_read` | 最新状态与revision |
-| `pixso_patch` | 受限声明式编辑，最多50项 |
+| `pixso_patch` | 受限声明式编辑，最多50项，含 `library-instance` 原生资产实例化 |
+| `pixso_library` | 离线检索全部资产页面、组件族、真实变体与属性 |
 | `pixso_components` | 查真实组件/变体 |
 | `pixso_read_reference` | 只读提取规范文字与组件；远程传规范targetUrl |
 | `pixso_audit` | 字体/溢出、明确图层组尺寸坐标检查与规范读取证据 |

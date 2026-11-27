@@ -1,6 +1,6 @@
 {
   "name": "hd-pixso-codex-integration",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "Scoped local and remote Pixso design with UI/UX Pro Max precision review",

@@ -44126,6 +44126,13 @@ var base = {
   props: layerPropsSchema.default({})
 };
 var patchOperationSchema = external_exports.discriminatedUnion("op", [
+  external_exports.object({
+    op: external_exports.literal("library-instance"),
+    ...base,
+    familyId: nodeIdSchema,
+    variants: external_exports.record(external_exports.string().max(200), external_exports.string().max(300)).default({}),
+    componentProperties: external_exports.record(external_exports.string().max(300), external_exports.union([external_exports.string().max(2e4), external_exports.boolean()])).default({})
+  }).strict(),
   external_exports.object({ op: external_exports.literal("update"), nodeId: nodeIdSchema, props: layerPropsSchema }).strict(),
   external_exports.object({ op: external_exports.literal("insert"), ...base, kind: external_exports.enum(["frame", "text", "rectangle"]) }).strict(),
   external_exports.object({ op: external_exports.literal("clone"), ...base, sourceId: nodeIdSchema }).strict(),
@@ -44139,6 +44146,7 @@ var patchOperationSchema = external_exports.discriminatedUnion("op", [
 
 // src/plugin-info.js
 import { readFileSync } from "node:fs";
+var PLUGIN_ROOT = new URL("../", import.meta.url);
 var packageInfo = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 var PLUGIN_NAME = "hd-pixso-codex";
 var PLUGIN_VERSION = packageInfo.version;
@@ -46700,6 +46708,121 @@ function createUpstream(mode = process.env.PIXSO_CONNECTION_MODE || "local") {
 // src/design/design-service.js
 import { createHash, randomUUID } from "node:crypto";
 
+// src/library/catalog.js
+import { readFileSync as readFileSync2 } from "node:fs";
+var catalog = JSON.parse(
+  readFileSync2(new URL("assets/libraries/ant-design-vue.json", PLUGIN_ROOT), "utf8")
+);
+var LIBRARY_ID = catalog.id;
+var families = new Map(catalog.families.map((family) => [family.id, family]));
+var summary = (family) => ({
+  familyId: family.id,
+  name: family.name,
+  page: family.page,
+  type: family.type,
+  variantCount: family.variants.length
+});
+function searchLibrary({ query = "", page, familyId, offset = 0, limit = 20 } = {}) {
+  if (familyId) {
+    const family = families.get(familyId);
+    if (!family) throw Error("LIBRARY_FAMILY_NOT_FOUND");
+    return {
+      libraryId: LIBRARY_ID,
+      source: catalog.source,
+      ...summary(family),
+      definitions: family.definitions,
+      total: family.variants.length,
+      offset,
+      nextOffset: offset + limit < family.variants.length ? offset + limit : null,
+      variants: family.variants.slice(offset, offset + limit)
+    };
+  }
+  const matches = catalog.families.filter(
+    (f) => (!page || f.page.toLowerCase() === page.toLowerCase()) && `${f.page} ${f.name}`.toLowerCase().includes(query.toLowerCase())
+  );
+  return {
+    libraryId: LIBRARY_ID,
+    source: catalog.source,
+    coverage: {
+      pages: catalog.pages.length,
+      families: catalog.families.length,
+      variants: catalog.families.reduce((sum, f) => sum + f.variants.length, 0)
+    },
+    pages: catalog.pages.filter((p) => !page || p.name.toLowerCase() === page.toLowerCase()).map((p) => ({
+      id: p.id,
+      name: p.name,
+      components: p.components,
+      componentSets: p.componentSets,
+      role: p.components ? "components" : p.nodes > 1 ? "reference" : "separator",
+      sampledPublishStatus: p.sampledPublishStatus,
+      ...page ? {
+        referenceNodes: p.referenceNodes.slice(offset, offset + limit),
+        referenceTotal: p.referenceNodes.length
+      } : {}
+    })),
+    total: matches.length,
+    offset,
+    families: matches.slice(offset, offset + limit).map(summary),
+    nextOffset: offset + limit < matches.length ? offset + limit : null,
+    notice: "Metadata coverage is not import verification. Published library access is required across files. The UI kit declares 4.2.3; code API compatibility still needs verification."
+  };
+}
+function selectLibraryVariant(familyId, variants = {}, componentProperties = {}) {
+  const family = families.get(familyId);
+  if (!family) throw Error("LIBRARY_FAMILY_NOT_FOUND");
+  const defs = family.definitions;
+  for (const [name, value] of Object.entries(variants)) {
+    if (defs[name]?.type !== "VARIANT" || !defs[name].variantOptions.includes(value))
+      throw Error(`LIBRARY_VARIANT_UNSUPPORTED: ${name}=${value}`);
+  }
+  const matches = family.variants.filter(
+    (v) => Object.entries(variants).every(([name, value]) => v.properties[name] === value)
+  );
+  const defaults = Object.fromEntries(
+    Object.entries(defs).filter(([, def]) => def.type === "VARIANT").map(([name, def]) => [name, variants[name] ?? def.defaultValue])
+  );
+  const preferred = matches.filter(
+    (v) => Object.entries(defaults).every(([name, value]) => v.properties[name] === value)
+  );
+  const chosen = preferred.length === 1 ? preferred[0] : matches.length === 1 ? matches[0] : null;
+  if (!chosen)
+    throw Error(
+      matches.length ? "LIBRARY_VARIANT_AMBIGUOUS: specify remaining axes" : "LIBRARY_VARIANT_COMBINATION_MISSING"
+    );
+  for (const [name, value] of Object.entries(componentProperties)) {
+    const type = defs[name]?.type;
+    if (!["TEXT", "BOOLEAN"].includes(type) || type === "TEXT" && (typeof value !== "string" || value.length > 2e4) || type === "BOOLEAN" && typeof value !== "boolean")
+      throw Error(`LIBRARY_PROPERTY_UNSUPPORTED: ${name}`);
+  }
+  return {
+    libraryId: LIBRARY_ID,
+    sourceFileKey: catalog.source.fileKey,
+    familyId,
+    sourceNodeId: chosen.nodeId,
+    key: chosen.key,
+    name: chosen.name,
+    variantProperties: chosen.properties,
+    componentProperties,
+    // 仅为本次覆盖保留定义；真正写入前仍核对原生实例可用属性。
+    propertyDefinitions: Object.fromEntries(
+      Object.keys(componentProperties).map((name) => [name, defs[name]])
+    )
+  };
+}
+function libraryRecommendation(semantic) {
+  const pages = { datePicker: "DatePicker", datepicker: "DatePicker" };
+  const page = catalog.pages.find(
+    (p) => p.name.toLowerCase() === (pages[semantic] || semantic).toLowerCase()
+  );
+  return page ? {
+    libraryId: LIBRARY_ID,
+    page: page.name,
+    components: page.components,
+    status: page.components ? "catalogued-not-instanced" : "reference-only",
+    tool: "pixso_library"
+  } : null;
+}
+
 // src/design/canvas-runtime.js
 async function canvasRuntime(input2) {
   const api = pixso;
@@ -46781,6 +46904,11 @@ async function canvasRuntime(input2) {
         row.textSegments = plain(
           n.getStyledTextSegments(["fontName", "fontSize", "fills", "textStyleId"])
         );
+      }
+      if (n.type === "INSTANCE") {
+        row.mainComponentKey = n.mainComponent?.key ?? null;
+        row.componentProperties = plain(n.componentProperties);
+        row.variantProperties = plain(n.variantProperties);
       }
       if (n.children) row.children = n.children.map((c) => visit2(c, depth + 1));
       return row;
@@ -47000,6 +47128,7 @@ async function canvasRuntime(input2) {
   ]);
   const aliases = /* @__PURE__ */ new Map();
   const sourceStates = /* @__PURE__ */ new Map();
+  const librarySources = /* @__PURE__ */ new Map();
   function resolve2(id) {
     if (typeof id !== "string") fail("INVALID_NODE_ID");
     if (id.startsWith("$")) {
@@ -47059,7 +47188,8 @@ async function canvasRuntime(input2) {
       if (n.type === "PAGE") fail("PAGE_UPDATE_UNSUPPORTED", "Edit a frame instead");
       validateProps(op.props || {}, n.type);
     } else {
-      if (!["insert", "clone", "instance"].includes(op.op)) fail("INVALID_OPERATION");
+      if (!["insert", "clone", "instance", "library-instance"].includes(op.op))
+        fail("INVALID_OPERATION");
       if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(op.key || "") || aliases.has(op.key))
         fail("INVALID_BINDING");
       const parent = resolve2(op.parentId);
@@ -47067,7 +47197,13 @@ async function canvasRuntime(input2) {
       if (!["PAGE", "FRAME", "GROUP", "SECTION", "COMPONENT"].includes(parent.type))
         fail("INVALID_PARENT");
       let type;
-      if (op.op === "insert") {
+      if (op.op === "library-instance") {
+        if (!op.asset?.key || !op.asset?.sourceFileKey || !op.asset?.name)
+          fail("LIBRARY_ASSET_REQUIRED");
+        if (Object.keys(op.asset.componentProperties || {}).length && Object.keys(op.props || {}).some((key) => ["text", "fontName", "fontSize"].includes(key)))
+          fail("LIBRARY_INSTANCE_TEXT_PROPERTY_REQUIRED");
+        type = "INSTANCE";
+      } else if (op.op === "insert") {
         type = { frame: "FRAME", rectangle: "RECTANGLE", text: "TEXT" }[op.kind];
         if (!type) fail("INVALID_KIND");
       } else {
@@ -47085,6 +47221,25 @@ async function canvasRuntime(input2) {
       aliases.set(op.key, { type, pending: true });
     }
   }
+  for (const op of operations.filter((op2) => op2.op === "library-instance")) {
+    const asset = op.asset;
+    let source = api.fileKey === asset.sourceFileKey ? get(asset.sourceNodeId) : null;
+    if (!source) {
+      if (typeof api.importComponentByKeyAsync !== "function") fail("LIBRARY_IMPORT_UNAVAILABLE");
+      try {
+        source = await api.importComponentByKeyAsync(asset.key);
+      } catch (e) {
+        fail("LIBRARY_IMPORT_FAILED", "Component must be published and accessible; " + String(e));
+      }
+    }
+    if (!source || source.type !== "COMPONENT" || source.key !== asset.key || source.name !== asset.name)
+      fail("LIBRARY_ASSET_CHANGED", asset.sourceNodeId);
+    const actual = plain(source.variantProperties) || {};
+    if (Object.entries(asset.variantProperties).some(([key, value]) => actual[key] !== value))
+      fail("LIBRARY_VARIANT_CHANGED", source.id);
+    sourceStates.set(source.id, snapshot(source).state);
+    librarySources.set(op.key, source);
+  }
   const fontSet = /* @__PURE__ */ new Map();
   function collectFonts(n) {
     if (n.type === "TEXT" && n.fontName && n.fontName !== api.mixed) {
@@ -47097,6 +47252,7 @@ async function canvasRuntime(input2) {
     if (op.op === "update" && !op.nodeId.startsWith("$")) collectFonts(get(op.nodeId));
     if (op.op === "clone") collectFonts(get(op.sourceId));
     if (op.op === "instance") collectFonts(get(op.componentId));
+    if (op.op === "library-instance") collectFonts(librarySources.get(op.key));
     if (op.op === "insert" && op.kind === "text") {
       const f = { family: "Noto Sans SC", style: "Regular" };
       fontSet.set(JSON.stringify(f), f);
@@ -47112,7 +47268,7 @@ async function canvasRuntime(input2) {
   for (const [id, state] of sourceStates)
     if (snapshot(get(id)).state !== state) fail("STALE_SOURCE", id);
   aliases.clear();
-  const undo = [], created = {}, updated = [], sourceIds = [...sourceStates.keys()];
+  const undo = [], created = {}, libraryInstances = {}, updated = [], sourceIds = [...sourceStates.keys()];
   const color = (hex3) => [
     {
       type: "SOLID",
@@ -47181,6 +47337,7 @@ async function canvasRuntime(input2) {
         let n;
         if (op.op === "clone") n = get(op.sourceId).clone();
         else if (op.op === "instance") n = get(op.componentId).createInstance();
+        else if (op.op === "library-instance") n = librarySources.get(op.key).createInstance();
         else
           n = op.kind === "frame" ? api.createFrame() : op.kind === "text" ? api.createText() : api.createRectangle();
         undo.push(() => {
@@ -47191,14 +47348,43 @@ async function canvasRuntime(input2) {
         created[op.key] = n.id;
         if (n.type === "TEXT" && op.op === "insert")
           n.fontName = { family: "Noto Sans SC", style: "Regular" };
+        if (op.op === "library-instance") {
+          const overrides = op.asset.componentProperties || {};
+          if (Object.keys(overrides).length) {
+            if (typeof n.setProperties !== "function") fail("LIBRARY_PROPERTIES_UNAVAILABLE");
+            const native = n.componentProperties || {};
+            for (const [key, value] of Object.entries(overrides)) {
+              if (!native[key] || native[key].type !== op.asset.propertyDefinitions[key].type)
+                fail("LIBRARY_PROPERTY_CHANGED", key);
+            }
+            n.setProperties(overrides);
+            for (const [key, value] of Object.entries(overrides))
+              if (n.componentProperties?.[key]?.value !== value) fail("READBACK_MISMATCH", key);
+          }
+          if (n.type !== "INSTANCE" || n.mainComponent?.key !== op.asset.key)
+            fail("LIBRARY_INSTANCE_READBACK_MISMATCH");
+          const actual = plain(n.variantProperties) || {};
+          for (const [key, value] of Object.entries(op.asset.variantProperties))
+            if (actual[key] !== value) fail("LIBRARY_VARIANT_READBACK_MISMATCH", key);
+        }
         setProps(n, op.props || {}, false);
+        if (op.op === "library-instance")
+          libraryInstances[op.key] = {
+            nodeId: n.id,
+            libraryId: op.asset.libraryId,
+            familyId: op.asset.familyId,
+            componentKey: n.mainComponent.key,
+            variants: plain(n.variantProperties) || {},
+            componentProperties: plain(n.componentProperties) || {},
+            method: api.fileKey === op.asset.sourceFileKey ? "same-file" : "import-by-key"
+          };
         if (!inside(n, root)) fail("OUT_OF_SCOPE", n.id);
       }
     }
     for (const id of sourceIds)
       if (!inside(get(id), root) && snapshot(get(id)).state !== sourceStates.get(id))
         fail("SOURCE_CHANGED", id);
-    return { verified: true, created, updated, ...snapshot(root) };
+    return { verified: true, created, updated, libraryInstances, ...snapshot(root) };
   } catch (e) {
     const errors = [];
     for (const rollback of undo.reverse()) {
@@ -47386,7 +47572,7 @@ async function inspectProject(projectRoot) {
     config: await loadProjectConfig(root)
   };
 }
-var catalog = {
+var catalog2 = {
   table: "a-table",
   select: "a-select",
   button: "a-button",
@@ -47410,7 +47596,7 @@ function chooseComponent(semantic, config2 = {}, project = null) {
       evidence: "explicit-config"
     };
   const candidates = (project?.components || []).filter(
-    (c) => c.name.toLowerCase().includes(semantic.toLowerCase()) || c.antDesignUsage.includes(catalog[semantic])
+    (c) => c.name.toLowerCase().includes(semantic.toLowerCase()) || c.antDesignUsage.includes(catalog2[semantic])
   );
   if (candidates.length)
     return {
@@ -47426,12 +47612,12 @@ function chooseComponent(semantic, config2 = {}, project = null) {
       status: mappings[0].design ? "mapped" : "needs-design-mapping",
       evidence: "explicit-config"
     };
-  if (catalog[semantic])
+  if (catalog2[semantic])
     return {
       semantic,
       provider: "ant-design-vue",
       status: "needs-design-mapping",
-      code: { name: catalog[semantic], importFrom: "ant-design-vue" },
+      code: { name: catalog2[semantic], importFrom: "ant-design-vue" },
       version: project?.antDesignVue.resolved ?? null,
       defaultRange: "^4.1.0",
       evidence: "baseline-catalog",
@@ -47564,12 +47750,23 @@ var DesignService = class {
       const s = this.session(scopeToken);
       if (s.revision !== expectedRevision)
         throw Error("STALE_REVISION: use the latest pixso_read revision");
-      let checkedOperations = operations;
+      let checkedOperations = operations.map(
+        (op) => op.op === "library-instance" ? { ...op, asset: selectLibraryVariant(op.familyId, op.variants, op.componentProperties) } : op
+      );
+      if (operations.some((op) => op.op === "library-instance") && projectRoot) {
+        const project = await inspectProject(projectRoot);
+        for (const op of operations.filter((op2) => op2.op === "library-instance")) {
+          const family = searchLibrary({ familyId: op.familyId });
+          const semantic = family.page[0].toLowerCase() + family.page.slice(1);
+          if (chooseComponent(semantic, project.config, project).provider === "project")
+            throw Error("PROJECT_COMPONENT_PRIORITY: resolve the existing project wrapper first");
+        }
+      }
       if (operations.some((op) => op.op === "instance")) {
         if (!projectRoot)
           throw Error("MAPPING_REQUIRED: supply the project containing .pixso-codex.json");
         const project = await inspectProject(projectRoot);
-        checkedOperations = operations.map((op) => {
+        checkedOperations = checkedOperations.map((op) => {
           if (op.op !== "instance") return op;
           if (!op.semantic)
             throw Error("MAPPING_REQUIRED: each instance needs a component semantic");
@@ -47599,6 +47796,7 @@ var DesignService = class {
         verified: true,
         created: value.created,
         updated: value.updated,
+        ...value.libraryInstances ? { libraryInstances: value.libraryInstances } : {},
         ...this.view(scopeToken, next)
       };
     });
@@ -47679,10 +47877,15 @@ var DesignService = class {
       return result;
     });
   }
+  /** 内置目录可离线检索；实际导入仍需 Pixso 连接、发布状态和文件权限。 */
+  library(args) {
+    return searchLibrary(args);
+  }
   /** 组件名相似只是候选线索，只有显式映射才能授权创建真实组件实例。 */
   async resolveComponent({ semantic, projectRoot }) {
     const project = projectRoot ? await inspectProject(projectRoot) : null;
-    return chooseComponent(semantic, project?.config ?? {}, project);
+    const result = chooseComponent(semantic, project?.config ?? {}, project);
+    return { ...result, designLibrary: libraryRecommendation(semantic) };
   }
 };
 
@@ -47757,7 +47960,7 @@ register(
 );
 register(
   "pixso_patch",
-  "\u6267\u884C\u6700\u591A50\u4E2A\u58F0\u660E\u5F0F\u56FE\u5C42\u64CD\u4F5C\uFF1Aupdate\u3001insert\u3001clone\u3001instance\u3002\u5FC5\u987B\u63D0\u4F9B\u6700\u65B0 revision\u3002\u62D2\u7EDD\u8D8A\u754C\u548C\u65E7\u5FEB\u7167\uFF1B\u8FD4\u56DE readback \u4E0E\u56DE\u6EDA\u7ED3\u679C\u3002\u7981\u6B62\u5728\u8D85\u65F6\u6216\u5931\u8D25\u540E\u76F4\u63A5\u91CD\u653E\u3002",
+  "\u6267\u884C\u6700\u591A50\u4E2A\u58F0\u660E\u5F0F\u56FE\u5C42\u64CD\u4F5C\uFF1Aupdate\u3001insert\u3001clone\u3001instance\u3001library-instance\u3002\u5FC5\u987B\u63D0\u4F9B\u6700\u65B0 revision\u3002\u62D2\u7EDD\u8D8A\u754C\u548C\u65E7\u5FEB\u7167\uFF1B\u8FD4\u56DE readback \u4E0E\u56DE\u6EDA\u7ED3\u679C\u3002\u7981\u6B62\u5728\u8D85\u65F6\u6216\u5931\u8D25\u540E\u76F4\u63A5\u91CD\u653E\u3002",
   {
     scopeToken: nodeIdSchema,
     expectedRevision: external_exports.string().min(1),
@@ -47766,6 +47969,18 @@ register(
   },
   (args) => service.patch(args),
   false
+);
+register(
+  "pixso_library",
+  "\u53EA\u8BFB\u68C0\u7D22\u5185\u7F6E Ant Design Vue \u5168\u9875\u9762\u76EE\u5F55\u3002\u6309 page/query \u67E5\u7EC4\u4EF6\u65CF\uFF0CfamilyId \u67E5\u771F\u5B9E\u53D8\u4F53\u548C\u5C5E\u6027\uFF1B\u8FD4\u56DE\u6765\u6E90\u53CA\u8986\u76D6\u4FE1\u606F\uFF0C\u4E0D\u628A\u76EE\u5F55\u547D\u4E2D\u7B49\u540C\u4E8E\u8DE8\u6587\u4EF6\u5BFC\u5165\u6210\u529F\u3002",
+  {
+    query: external_exports.string().max(300).default(""),
+    page: external_exports.string().max(200).optional(),
+    familyId: nodeIdSchema.optional(),
+    offset: external_exports.number().int().min(0).default(0),
+    limit: external_exports.number().int().min(1).max(50).default(20)
+  },
+  (args) => service.library(args)
 );
 register(
   "pixso_components",

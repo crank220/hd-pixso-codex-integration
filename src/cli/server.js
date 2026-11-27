@@ -81,7 +81,7 @@ register(
 );
 register(
   'pixso_patch',
-  '执行最多50个声明式图层操作：update、insert、clone、instance。必须提供最新 revision。拒绝越界和旧快照；返回 readback 与回滚结果。禁止在超时或失败后直接重放。',
+  '执行最多50个声明式图层操作：update、insert、clone、instance、library-instance。必须提供最新 revision。拒绝越界和旧快照；返回 readback 与回滚结果。禁止在超时或失败后直接重放。',
   {
     scopeToken: id,
     expectedRevision: z.string().min(1),
@@ -90,6 +90,18 @@ register(
   },
   (args) => service.patch(args),
   false,
+);
+register(
+  'pixso_library',
+  '只读检索内置 Ant Design Vue 全页面目录。按 page/query 查组件族，familyId 查真实变体和属性；返回来源及覆盖信息，不把目录命中等同于跨文件导入成功。',
+  {
+    query: z.string().max(300).default(''),
+    page: z.string().max(200).optional(),
+    familyId: id.optional(),
+    offset: z.number().int().min(0).default(0),
+    limit: z.number().int().min(1).max(50).default(20),
+  },
+  (args) => service.library(args),
 );
 register(
   'pixso_components',

@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "hd-pixso-codex",
-  "version": "0.2.3",
-  "description": "本地/远程 Pixso 双窗口设计：UI/UX Pro Max 精修、统一图标状态、纯产品页面与画板外规范标注。",
+  "version": "0.3.0",
+  "description": "本地/远程 Pixso 设计，内置 Ant Design Vue 全页资产目录、真实变体选择与受限原生实例化。",
   "author": {
     "name": "crank220",
     "url": "https://github.com/crank220"

@@ -91,6 +91,11 @@ export async function canvasRuntime(input) {
           n.getStyledTextSegments(['fontName', 'fontSize', 'fills', 'textStyleId']),
         );
       }
+      if (n.type === 'INSTANCE') {
+        row.mainComponentKey = n.mainComponent?.key ?? null;
+        row.componentProperties = plain(n.componentProperties);
+        row.variantProperties = plain(n.variantProperties);
+      }
       if (n.children) row.children = n.children.map((c) => visit(c, depth + 1));
       return row;
     }
@@ -334,6 +339,7 @@ export async function canvasRuntime(input) {
   ]);
   const aliases = new Map();
   const sourceStates = new Map();
+  const librarySources = new Map();
   function resolve(id) {
     if (typeof id !== 'string') fail('INVALID_NODE_ID');
     if (id.startsWith('$')) {
@@ -413,7 +419,8 @@ export async function canvasRuntime(input) {
       if (n.type === 'PAGE') fail('PAGE_UPDATE_UNSUPPORTED', 'Edit a frame instead');
       validateProps(op.props || {}, n.type);
     } else {
-      if (!['insert', 'clone', 'instance'].includes(op.op)) fail('INVALID_OPERATION');
+      if (!['insert', 'clone', 'instance', 'library-instance'].includes(op.op))
+        fail('INVALID_OPERATION');
       if (!/^[A-Za-z][A-Za-z0-9_]{0,63}$/.test(op.key || '') || aliases.has(op.key))
         fail('INVALID_BINDING');
       const parent = resolve(op.parentId);
@@ -421,7 +428,16 @@ export async function canvasRuntime(input) {
       if (!['PAGE', 'FRAME', 'GROUP', 'SECTION', 'COMPONENT'].includes(parent.type))
         fail('INVALID_PARENT');
       let type;
-      if (op.op === 'insert') {
+      if (op.op === 'library-instance') {
+        if (!op.asset?.key || !op.asset?.sourceFileKey || !op.asset?.name)
+          fail('LIBRARY_ASSET_REQUIRED');
+        if (
+          Object.keys(op.asset.componentProperties || {}).length &&
+          Object.keys(op.props || {}).some((key) => ['text', 'fontName', 'fontSize'].includes(key))
+        )
+          fail('LIBRARY_INSTANCE_TEXT_PROPERTY_REQUIRED');
+        type = 'INSTANCE';
+      } else if (op.op === 'insert') {
         type = { frame: 'FRAME', rectangle: 'RECTANGLE', text: 'TEXT' }[op.kind];
         if (!type) fail('INVALID_KIND');
       } else {
@@ -448,6 +464,31 @@ export async function canvasRuntime(input) {
       aliases.set(op.key, { type, pending: true });
     }
   }
+  // 全批预检后才允许导入库依赖。只读源组件，禁止为了可用性自动发布或重建源库。
+  for (const op of operations.filter((op) => op.op === 'library-instance')) {
+    const asset = op.asset;
+    let source = api.fileKey === asset.sourceFileKey ? get(asset.sourceNodeId) : null;
+    if (!source) {
+      if (typeof api.importComponentByKeyAsync !== 'function') fail('LIBRARY_IMPORT_UNAVAILABLE');
+      try {
+        source = await api.importComponentByKeyAsync(asset.key);
+      } catch (e) {
+        fail('LIBRARY_IMPORT_FAILED', 'Component must be published and accessible; ' + String(e));
+      }
+    }
+    if (
+      !source ||
+      source.type !== 'COMPONENT' ||
+      source.key !== asset.key ||
+      source.name !== asset.name
+    )
+      fail('LIBRARY_ASSET_CHANGED', asset.sourceNodeId);
+    const actual = plain(source.variantProperties) || {};
+    if (Object.entries(asset.variantProperties).some(([key, value]) => actual[key] !== value))
+      fail('LIBRARY_VARIANT_CHANGED', source.id);
+    sourceStates.set(source.id, snapshot(source).state);
+    librarySources.set(op.key, source);
+  }
   // 字体加载会让出执行权；此期间用户可能改稿，异步完成后必须再次比较完整快照。
   const fontSet = new Map();
   function collectFonts(n) {
@@ -461,6 +502,7 @@ export async function canvasRuntime(input) {
     if (op.op === 'update' && !op.nodeId.startsWith('$')) collectFonts(get(op.nodeId));
     if (op.op === 'clone') collectFonts(get(op.sourceId));
     if (op.op === 'instance') collectFonts(get(op.componentId));
+    if (op.op === 'library-instance') collectFonts(librarySources.get(op.key));
     if (op.op === 'insert' && op.kind === 'text') {
       const f = { family: 'Noto Sans SC', style: 'Regular' };
       fontSet.set(JSON.stringify(f), f);
@@ -478,6 +520,7 @@ export async function canvasRuntime(input) {
   aliases.clear();
   const undo = [],
     created = {},
+    libraryInstances = {},
     updated = [],
     sourceIds = [...sourceStates.keys()];
   const color = (hex) => [
@@ -561,6 +604,7 @@ export async function canvasRuntime(input) {
         let n;
         if (op.op === 'clone') n = get(op.sourceId).clone();
         else if (op.op === 'instance') n = get(op.componentId).createInstance();
+        else if (op.op === 'library-instance') n = librarySources.get(op.key).createInstance();
         else
           n =
             op.kind === 'frame'
@@ -576,14 +620,43 @@ export async function canvasRuntime(input) {
         created[op.key] = n.id;
         if (n.type === 'TEXT' && op.op === 'insert')
           n.fontName = { family: 'Noto Sans SC', style: 'Regular' };
+        if (op.op === 'library-instance') {
+          const overrides = op.asset.componentProperties || {};
+          if (Object.keys(overrides).length) {
+            if (typeof n.setProperties !== 'function') fail('LIBRARY_PROPERTIES_UNAVAILABLE');
+            const native = n.componentProperties || {};
+            for (const [key, value] of Object.entries(overrides)) {
+              if (!native[key] || native[key].type !== op.asset.propertyDefinitions[key].type)
+                fail('LIBRARY_PROPERTY_CHANGED', key);
+            }
+            n.setProperties(overrides);
+            for (const [key, value] of Object.entries(overrides))
+              if (n.componentProperties?.[key]?.value !== value) fail('READBACK_MISMATCH', key);
+          }
+          if (n.type !== 'INSTANCE' || n.mainComponent?.key !== op.asset.key)
+            fail('LIBRARY_INSTANCE_READBACK_MISMATCH');
+          const actual = plain(n.variantProperties) || {};
+          for (const [key, value] of Object.entries(op.asset.variantProperties))
+            if (actual[key] !== value) fail('LIBRARY_VARIANT_READBACK_MISMATCH', key);
+        }
         setProps(n, op.props || {}, false);
+        if (op.op === 'library-instance')
+          libraryInstances[op.key] = {
+            nodeId: n.id,
+            libraryId: op.asset.libraryId,
+            familyId: op.asset.familyId,
+            componentKey: n.mainComponent.key,
+            variants: plain(n.variantProperties) || {},
+            componentProperties: plain(n.componentProperties) || {},
+            method: api.fileKey === op.asset.sourceFileKey ? 'same-file' : 'import-by-key',
+          };
         if (!inside(n, root)) fail('OUT_OF_SCOPE', n.id);
       }
     }
     for (const id of sourceIds)
       if (!inside(get(id), root) && snapshot(get(id)).state !== sourceStates.get(id))
         fail('SOURCE_CHANGED', id);
-    return { verified: true, created, updated, ...snapshot(root) };
+    return { verified: true, created, updated, libraryInstances, ...snapshot(root) };
   } catch (e) {
     const errors = [];
     for (const rollback of undo.reverse()) {

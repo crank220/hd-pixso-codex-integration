@@ -42,8 +42,19 @@ const base = {
   parentId: nodeIdSchema,
   props: layerPropsSchema.default({}),
 };
-/** 严格区分四种操作；不暴露任意脚本、删除、跨页移动或全局样式写入口。 */
+/** 严格区分声明式操作；不暴露任意脚本、删除、跨页移动或全局样式写入口。 */
 export const patchOperationSchema = z.discriminatedUnion('op', [
+  z
+    .object({
+      op: z.literal('library-instance'),
+      ...base,
+      familyId: nodeIdSchema,
+      variants: z.record(z.string().max(200), z.string().max(300)).default({}),
+      componentProperties: z
+        .record(z.string().max(300), z.union([z.string().max(20000), z.boolean()]))
+        .default({}),
+    })
+    .strict(),
   z.object({ op: z.literal('update'), nodeId: nodeIdSchema, props: layerPropsSchema }).strict(),
   z
     .object({ op: z.literal('insert'), ...base, kind: z.enum(['frame', 'text', 'rectangle']) })

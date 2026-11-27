@@ -38,6 +38,8 @@ for (const file of [
   'dist/THIRD_PARTY_LICENSES.txt',
   'skills/hd-design/SKILL.md',
   'assets/icon.svg',
+  'assets/libraries/ant-design-vue.json',
+  'skills/hd-design/references/library.md',
 ])
   await access(file);
 if ((await stat('dist/server.js')).size < 1000) throw Error('Empty runtime bundle');

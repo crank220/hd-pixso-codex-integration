@@ -11,6 +11,7 @@ src/
   design/               范围会话、快照版本、画布编辑与审查
   pixso/                连接地址、工具发现与上游协议适配
   auth/                 OAuth 凭据存储、PKCE 与回调校验
+  library/              内置资产目录查询、真实变体与属性选择
   project/              只读 Vue 项目检查、锁版本与组件映射
   plugin-info.js        从 package.json 读取运行版本
 tests/
@@ -21,7 +22,7 @@ tests/
 scripts/                构建、诊断、只读 smoke、打包与包验收
 examples/               可复制到业务项目的配置示例
 skills/hd-design/       设计工作流、参考规则与授权分发的检索数据
-assets/                 插件图标
+assets/                 插件图标与全页组件元数据目录
 docs/                   使用边界、架构、变更与验证记录
   superpowers/          首版方案与计划归档，保留当时的路径和决策
 dist/                   生成的独立运行入口与依赖许可证
@@ -32,12 +33,12 @@ artifacts/              本机生成的 ZIP 与校验和，不提交 Git
 
 ## 依赖与执行边界
 
-1. `cli/server.js` 负责注册工具和请求队列；参数由 `mcp/tool-schemas.js` 校验。对外仍是原有 11 个工具，不暴露任意脚本执行工具。
-2. `design/design-service.js` 管理范围、完整快照摘要和规范读取凭据，调用 `pixso/upstream.js`；组件实例化前通过 `project/inspect-project.js` 核对显式映射。
+1. `cli/server.js` 负责注册工具和请求队列；参数由 `mcp/tool-schemas.js` 校验。对外为 12 个工具（包含 pixso_library），不暴露任意脚本执行工具。
+2. `design/design-service.js` 管理范围、完整快照摘要和规范读取凭据，调用 `pixso/upstream.js`；项目组件实例化前通过 `project/inspect-project.js` 核对显式映射；library-instance 通过 `library/catalog.js` 从内置目录解析受限 key、变体和文本/布尔覆盖，不能注入任意组件 key。
 3. `pixso/upstream.js` 负责 HTTP、工具发现和授权适配；`auth/oauth-provider.js` 仅向 SDK 提供本机凭据，不把 token 放进快照或聊天输出。
 4. `design/canvas-runtime.js` 通过 `toString()` 发送到 Pixso 沙箱。它必须自包含，不能引用 Node import 或外部变量；按普通模块拆出内部 helper 会使沙箱缺少依赖，因此保留在一个函数中。
 
-设计写入的检查顺序是：文档身份与范围 → 完整快照 → 全批预检 → 异步字体加载后再验 → 写入 → 逐项读回。局部写入失败后逆序补偿；只有完整快照一致才返回 `rollback.verified=true`。超时后不能自动重发，因为原生编辑可能已经发生。
+设计写入的检查顺序是：文档身份与范围 → 完整快照 → 全批预检 → 库依赖导入、异步字体加载后再验 → 写入 → 逐项读回。局部写入失败后逆序补偿；只有完整快照一致才返回 `rollback.verified=true`。超时后不能自动重发，因为原生编辑可能已经发生。
 
 `revision` 来自完整快照，返回树的深度和数量裁剪只用于控制上下文大小。切换连接模式会创建新的服务实例并使旧范围失效。公司规范读取凭据、几何检查和截图审查是三个不同证据，不能互相替代。
 
@@ -46,6 +47,10 @@ artifacts/              本机生成的 ZIP 与校验和，不提交 Git
 自有 JavaScript 文件用中文文件概述说明职责；关键公共接口使用 JSDoc。注释重点说明权限边界、版本规则、异步竞态、恢复条件、单位和副作用，不逐行复述普通语句。错误码、公开字段和 MCP 工具名保持原有契约；第三方代码及许可证不改写。
 
 使用 Prettier 固定两个空格缩进。`npm run format` 只处理 `src/`、`scripts/`、`tests/`；忽略生成包、依赖、第三方 schema 和内置 UI/UX Pro Max。`npm run check` 会先检查格式，再运行现有回归、构建和发布清单校验。
+
+## 组件库目录更新
+
+在 Pixso 桌面激活指定源库后执行 `node scripts/index-library.js`，脚本核对 fileKey、全部页面及每页组件数量，只更新本地目录，不写画布、不发布库。资产源身份和版本声明需人工核对；页面发生变化时检查覆盖数、对应测试及 README，再构建发布。
 
 ## 构建与发布
 

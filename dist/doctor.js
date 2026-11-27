@@ -7357,6 +7357,7 @@ var require_content_type = __commonJS({
 
 // src/plugin-info.js
 import { readFileSync } from "node:fs";
+var PLUGIN_ROOT = new URL("../", import.meta.url);
 var packageInfo = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
 var PLUGIN_NAME = "hd-pixso-codex";
 var PLUGIN_VERSION = packageInfo.version;

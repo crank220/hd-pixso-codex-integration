@@ -1,5 +1,6 @@
 // 管理设计范围、完整快照版本和规范读取凭据，协调受限编辑与验证。
 import { createHash, randomUUID } from 'node:crypto';
+import { searchLibrary, selectLibraryVariant, libraryRecommendation } from '../library/catalog.js';
 import { canvasRuntime } from './canvas-runtime.js';
 import { inspectProject, chooseComponent, loadProjectConfig } from '../project/inspect-project.js';
 import { parseToolResult } from '../pixso/upstream.js';
@@ -125,12 +126,26 @@ export class DesignService {
       const s = this.session(scopeToken);
       if (s.revision !== expectedRevision)
         throw Error('STALE_REVISION: use the latest pixso_read revision');
-      let checkedOperations = operations;
+      // 资产 key 仅从内置目录解析，不能由工具调用方注入任意外部组件。
+      let checkedOperations = operations.map((op) =>
+        op.op === 'library-instance'
+          ? { ...op, asset: selectLibraryVariant(op.familyId, op.variants, op.componentProperties) }
+          : op,
+      );
+      if (operations.some((op) => op.op === 'library-instance') && projectRoot) {
+        const project = await inspectProject(projectRoot);
+        for (const op of operations.filter((op) => op.op === 'library-instance')) {
+          const family = searchLibrary({ familyId: op.familyId });
+          const semantic = family.page[0].toLowerCase() + family.page.slice(1);
+          if (chooseComponent(semantic, project.config, project).provider === 'project')
+            throw Error('PROJECT_COMPONENT_PRIORITY: resolve the existing project wrapper first');
+        }
+      }
       if (operations.some((op) => op.op === 'instance')) {
         if (!projectRoot)
           throw Error('MAPPING_REQUIRED: supply the project containing .pixso-codex.json');
         const project = await inspectProject(projectRoot);
-        checkedOperations = operations.map((op) => {
+        checkedOperations = checkedOperations.map((op) => {
           if (op.op !== 'instance') return op;
           if (!op.semantic)
             throw Error('MAPPING_REQUIRED: each instance needs a component semantic');
@@ -165,6 +180,7 @@ export class DesignService {
         verified: true,
         created: value.created,
         updated: value.updated,
+        ...(value.libraryInstances ? { libraryInstances: value.libraryInstances } : {}),
         ...this.view(scopeToken, next),
       };
     });
@@ -248,9 +264,14 @@ export class DesignService {
       return result;
     });
   }
+  /** 内置目录可离线检索；实际导入仍需 Pixso 连接、发布状态和文件权限。 */
+  library(args) {
+    return searchLibrary(args);
+  }
   /** 组件名相似只是候选线索，只有显式映射才能授权创建真实组件实例。 */
   async resolveComponent({ semantic, projectRoot }) {
     const project = projectRoot ? await inspectProject(projectRoot) : null;
-    return chooseComponent(semantic, project?.config ?? {}, project);
+    const result = chooseComponent(semantic, project?.config ?? {}, project);
+    return { ...result, designLibrary: libraryRecommendation(semantic) };
   }
 }
