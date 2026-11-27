@@ -13,12 +13,15 @@ const catalogs = new Map(
     return [entry.id, { ...data, purpose: entry.purpose }];
   }),
 );
-export const LIBRARY_ID = 'ant-design-vue-community';
-const getCatalog = (id = LIBRARY_ID) => {
+const ANT_LIBRARY_ID = 'ant-design-vue-community';
+const getCatalog = (id) => {
+  // 多库节点 ID 可重复；不再为缺失的库标识静默选择 Ant 库。
+  if (!id) throw Error('LIBRARY_ID_REQUIRED');
   const catalog = catalogs.get(id);
   if (!catalog) throw Error('LIBRARY_NOT_FOUND');
   return catalog;
 };
+// 注册顺序即资源使用顺序：公司样式、公司标注、Ant UI；不按名称重新排序。
 const libraries = () =>
   [...catalogs.values()].map((c) => ({
     id: c.id,
@@ -38,9 +41,9 @@ const summary = (family) => ({
   publishStatus: family.publishStatus ?? 'unknown',
 });
 
-/** 分页返回目录，显式 familyId 才返回属性定义与变体，避免一次输出整个组件库。 */
+/** libraryId 必填；分页返回目录，显式 familyId 才返回属性与变体。 */
 export function searchLibrary({
-  libraryId = LIBRARY_ID,
+  libraryId,
   kind = 'components',
   query = '',
   page,
@@ -111,7 +114,6 @@ export function searchLibrary({
         components: p.components,
         componentSets: p.componentSets,
         role: p.components ? 'components' : p.nodes > 1 ? 'reference' : 'separator',
-        sampledPublishStatus: p.sampledPublishStatus,
         publishStatuses: p.publishStatuses,
         ...(page
           ? {
@@ -130,12 +132,7 @@ export function searchLibrary({
 }
 
 /** 只允许目录中存在的组合；优先完整默认组合，不把含糊匹配静默选成第一个。 */
-export function selectLibraryVariant(
-  familyId,
-  variants = {},
-  componentProperties = {},
-  libraryId = LIBRARY_ID,
-) {
+export function selectLibraryVariant(libraryId, familyId, variants = {}, componentProperties = {}) {
   const catalog = getCatalog(libraryId);
   const family = catalog.families.find((row) => row.id === familyId);
   if (!family) throw Error('LIBRARY_FAMILY_NOT_FOUND');
@@ -189,14 +186,11 @@ export function selectLibraryVariant(
 
 /** 只返回目录入口，不把没有映射的推荐误报为已实例化或已核验 API。 */
 export function libraryRecommendation(semantic) {
-  const catalog = getCatalog();
-  const pages = { datePicker: 'DatePicker', datepicker: 'DatePicker' };
-  const page = catalog.pages.find(
-    (p) => p.name.toLowerCase() === (pages[semantic] || semantic).toLowerCase(),
-  );
+  const catalog = getCatalog(ANT_LIBRARY_ID);
+  const page = catalog.pages.find((p) => p.name.toLowerCase() === semantic.toLowerCase());
   return page
     ? {
-        libraryId: LIBRARY_ID,
+        libraryId: ANT_LIBRARY_ID,
         page: page.name,
         components: page.components,
         status: page.components ? 'catalogued-not-instanced' : 'reference-only',

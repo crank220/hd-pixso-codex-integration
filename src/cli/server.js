@@ -93,9 +93,9 @@ register(
 );
 register(
   'pixso_library',
-  '只读检索组件库、公司样式库与标注库。libraryId 指定库，kind 选择 components/styles/variables；按 page/query 查目录，familyId 查真实变体。返回真实key与发布状态，目录命中不代表已导入。',
+  '只读检索资源，使用顺序为设计文件 → UI/UX设计标注系统 → Ant Design Vue (Community)。libraryId 必填并指定库，kind 选择 components/styles/variables；按 page/query 查目录，familyId 查真实变体。返回真实key与发布状态，目录命中不代表已导入。',
   {
-    libraryId: id.default('ant-design-vue-community'),
+    libraryId: id,
     kind: z.enum(['components', 'styles', 'variables']).default('components'),
     query: z.string().max(300).default(''),
     page: z.string().max(200).optional(),

@@ -1,4 +1,4 @@
 interface:
-  display_name: "HD Design 双窗口设计"
+  display_name: "HD Codex + Pixso 双向工作流"
   short_description: "本地或远程 Pixso 设计，精修图层与图标状态，在画板外按公司规范标注"
   default_prompt: "使用 $hd-design 读取我指定的 Pixso 页面或图层链接，结合 UI/UX Pro Max 精修，保持页面纯净，并检查图标状态、范围和标注。"

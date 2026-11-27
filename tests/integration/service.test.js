@@ -13,10 +13,8 @@ const api = () => {
       async evaluate(script) {
         return vm.runInNewContext(`(async()=>{${script}})()`, { pixso: p });
       },
-      async call(name) {
-        if (name === 'get_mcp_server_info')
-          return { content: [{ type: 'text', text: '{"version":"test"}' }] };
-        throw Error('Unsupported external tool');
+      async info() {
+        return { version: 'test' };
       },
     },
   };

@@ -1,15 +1,15 @@
 {
   "name": "hd-pixso-codex",
-  "version": "0.4.0",
-  "description": "本地/远程 Pixso 设计，接入 Ant Design Vue、公司品牌样式和 UI/UX 标注组件及变量，按授权范围原生复用。",
+  "version": "0.5.0",
+  "description": "HD Codex + Pixso 双向工作流：支持本地/远程连接、组件与品牌样式复用、图层精修及公司 UI/UX 标注。",
   "author": {
     "name": "crank220"
   },
   "skills": "./skills/",
   "mcpServers": "./.mcp.json",
   "interface": {
-    "displayName": "Codex + Pixso 双窗口设计",
-    "shortDescription": "复用已有组件，只修改指定 Pixso 页面",
+    "displayName": "HD Codex + Pixso 双向工作流",
+    "shortDescription": "读取 Pixso 最新调整，按范围复用组件、精修图层与标注",
     "category": "Creativity",
     "capabilities": [
       "Read",

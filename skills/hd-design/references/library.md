@@ -1,13 +1,17 @@
-# 内置 Ant Design Vue 资产目录
+# 资源库与原生复用
+
+使用顺序：**设计文件 → UI/UX设计标注系统 → Ant Design Vue (Community)**。先确定品牌样式与标注规范，再选择UI组件；项目已有控件仍优先复用。
+
+## Ant Design Vue 资产目录
 
 使用用户指定的 **Ant Design Vue (Community)** 文件：`cqyV7EPRujL6ptWDBKKlSQ`。封面声明 **4.2.3**；这是 UI kit 的版本声明，不能自动证明它与项目安装的每个 API 相符。源组件及主定义只读，不自动发布团队库。
 
 ## 覆盖与查找
 
-`pixso_library()` 离线检索全部 **87 页、1013 个组件族、5007 个组件及变体**，含 Icon 页的独立组件。目录记录所有页面；Thumbnail、Overview、Color、Flex、Grid、Layout、Affix、ConfigProvider、App 等无主组件页面作为参考，分类分隔页保留记录但不算组件。
+`pixso_library({libraryId:"ant-design-vue-community"})` 离线检索全部 **87 页、1013 个组件族、5007 个组件及变体**，含 Icon 页的独立组件。目录记录所有页面；Thumbnail、Overview、Color、Flex、Grid、Layout、Affix、ConfigProvider、App 等无主组件页面作为参考，分类分隔页保留记录但不算组件。
 
-- `pixso_library({page:"Button"})` 找组件族；`page` 不需要原页面名中的缩进空格。
-- `pixso_library({familyId:"144:5014",offset:0,limit:20})` 读取属性定义和分页变体。属性名、大小写和值以返回数据为准，不能把另一套 Ant Design 库的命名套过来。
+- `pixso_library({libraryId:"ant-design-vue-community",page:"Button"})` 找组件族；`page` 不需要原页面名中的缩进空格。
+- `pixso_library({libraryId:"ant-design-vue-community",familyId:"144:5014",offset:0,limit:20})` 读取属性定义和分页变体。属性名、大小写和值以返回数据为准，不能把另一套 Ant Design 库的命名套过来。
 - 全页索引不需要扫描整页快照；Form、DatePicker 等大页面应按具体组件族处理，避免超过快照上限。
 
 目录随 ZIP 分发，包含真实 key、来源、原节点、属性与尺寸，不包含完整画布几何、业务设计稿或凭据；没有账号权限时不能把目录当作离线设计资产本体。
@@ -22,6 +26,7 @@
   "expectedRevision": "最新revision",
   "operations": [{
     "op": "library-instance",
+    "libraryId": "ant-design-vue-community",
     "key": "primaryHover",
     "parentId": "授权范围内的容器ID",
     "familyId": "144:5014",
@@ -60,9 +65,10 @@
 2026-11-27 本地真实跨文件已验证13个原生实例并检查截图，未逐一创建全部变体，也未完成真实远程账号验证。
 
 设计状态（hover、focused、pressed）与代码 props 分开：悬停并非一个名为 hover 的 Vue 属性。状态稿不等于运行原型。库版本、主题同步与 API 能力核验仍遵循具体项目证据，接入目录不代表其全部完成。
+
 ## 公司资源库
 
-`pixso_library` 每次返回可用库清单；`libraryId` 缺省仍是 `ant-design-vue-community`，旧调用兼容。公司品牌样式优先使用 `hd-company-styles`，标注资源使用 `hd-annotations`；资源以库标识和真实 key 定位，同名或同节点 ID 不构成跨库映射。
+`pixso_library` 每次返回可用库清单；检索和实例操作必须显式提供 `libraryId`，不再支持缺省选库。公司品牌样式优先使用 `hd-company-styles`，标注资源使用 `hd-annotations`；资源以库标识和真实 key 定位，同名或同节点 ID 不构成跨库映射。
 
 - 公司样式：`pixso_library({libraryId:"hd-company-styles",kind:"styles",query:"WEB/文字",limit:20})`。完整1页/36样式，返回真实key、发布状态和实际属性。命名与属性不一致时以实际读回为准并说明，不按名称重绘。
 - 标注组件：`pixso_library({libraryId:"hd-annotations",page:"控件"})`；再传 `familyId` 查变体。完整4页/9族/36变体，其中7族有发布版本（6 CURRENT、1 CHANGED），2族是未发布示例。原生实例必须显式传 `libraryId:"hd-annotations"`。

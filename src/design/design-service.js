@@ -56,9 +56,7 @@ export class DesignService {
         target = targetUrl ? parseLayerLink(targetUrl) : null;
       if (!remote && target)
         throw Error('REMOTE_MODE_REQUIRED: use pixso_connect with mode remote');
-      const server = this.upstream.info
-        ? await this.upstream.info()
-        : parseToolResult(await this.upstream.call('get_mcp_server_info'));
+      const server = await this.upstream.info();
       return {
         mode: remote ? 'remote' : 'local',
         server,
@@ -137,10 +135,10 @@ export class DesignService {
           ? {
               ...op,
               asset: selectLibraryVariant(
+                op.libraryId,
                 op.familyId,
                 op.variants,
                 op.componentProperties,
-                op.libraryId,
               ),
             }
           : op.op === 'library-style'
@@ -149,19 +147,24 @@ export class DesignService {
               ? { ...op, asset: selectLibraryResource(op.libraryId, 'variables', op.variableKey) }
               : op,
       );
-      if (operations.some((op) => op.op === 'library-instance') && projectRoot) {
-        const project = await inspectProject(projectRoot);
-        for (const op of operations.filter((op) => op.op === 'library-instance')) {
+      // 同一批次只读取一次项目，库实例和映射实例使用同一份组件优先级证据。
+      const libraryInstances = operations.filter((op) => op.op === 'library-instance');
+      const hasMappedInstances = operations.some((op) => op.op === 'instance');
+      if (hasMappedInstances && !projectRoot)
+        throw Error('MAPPING_REQUIRED: supply the project containing .pixso-codex.json');
+      const project =
+        projectRoot && (libraryInstances.length || hasMappedInstances)
+          ? await inspectProject(projectRoot)
+          : null;
+      if (project) {
+        for (const op of libraryInstances) {
           const family = searchLibrary({ libraryId: op.libraryId, familyId: op.familyId });
           const semantic = family.page[0].toLowerCase() + family.page.slice(1);
           if (chooseComponent(semantic, project.config, project).provider === 'project')
             throw Error('PROJECT_COMPONENT_PRIORITY: resolve the existing project wrapper first');
         }
       }
-      if (operations.some((op) => op.op === 'instance')) {
-        if (!projectRoot)
-          throw Error('MAPPING_REQUIRED: supply the project containing .pixso-codex.json');
-        const project = await inspectProject(projectRoot);
+      if (hasMappedInstances) {
         checkedOperations = checkedOperations.map((op) => {
           if (op.op !== 'instance') return op;
           if (!op.semantic)
@@ -274,9 +277,7 @@ export class DesignService {
     return this.serial(async () => {
       const s = this.session(scopeToken);
       await this.evaluate({ action: 'preview', scope: s.scope, nodeId });
-      const result = this.upstream.screenshot
-        ? await this.upstream.screenshot(s.scope.remoteTarget, nodeId || s.scope.rootId)
-        : await this.upstream.call('get_screenshot', { guid: nodeId || s.scope.rootId });
+      const result = await this.upstream.screenshot(s.scope.remoteTarget, nodeId || s.scope.rootId);
       parseToolResult(result); // 保持原生截图错误，不把错误文本伪装为成功图像。
       return result;
     });

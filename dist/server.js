@@ -44145,7 +44145,7 @@ var patchOperationSchema = external_exports.discriminatedUnion("op", [
     op: external_exports.literal("library-instance"),
     ...base,
     familyId: nodeIdSchema,
-    libraryId: nodeIdSchema.default("ant-design-vue-community"),
+    libraryId: nodeIdSchema,
     fontSubstitutions: external_exports.array(external_exports.object({ from: font, to: font }).strict()).max(32).default([]),
     variants: external_exports.record(external_exports.string().max(200), external_exports.string().max(300)).default({}),
     componentProperties: external_exports.record(external_exports.string().max(300), external_exports.union([external_exports.string().max(2e4), external_exports.boolean()])).default({})
@@ -46657,13 +46657,11 @@ var PixsoUpstream = class {
           inventory.push(...batch.tools);
           cursor = batch.nextCursor;
         } while (cursor);
-        const tools = { tools: inventory };
-        if (!tools.tools.some((t) => t.name === "eval_script"))
+        if (!inventory.some((t) => t.name === "eval_script"))
           throw Error(
             "PIXSO_EVAL_UNAVAILABLE: connected server must provide editable eval_script capability"
           );
-        this.toolSchemas = new Map(tools.tools.map((t) => [t.name, t]));
-        this.toolNames = new Set(tools.tools.map((t) => t.name));
+        this.toolSchemas = new Map(inventory.map((t) => [t.name, t]));
         this.client = client;
         return client;
       } catch (e) {
@@ -46679,7 +46677,7 @@ var PixsoUpstream = class {
   }
   async call(name, args = {}) {
     const client = await this.connect();
-    if (!this.toolNames.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
+    if (!this.toolSchemas.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
     return client.callTool({ name, arguments: args }, void 0, { timeout: 6e4 });
   }
   /** 仅供内部范围引擎调用；远程必须携带图层链接解析出的文件定位信息。 */
@@ -46697,7 +46695,7 @@ var PixsoUpstream = class {
   }
   async info() {
     await this.connect();
-    return this.toolNames.has("get_mcp_server_info") ? parseToolResult(await this.call("get_mcp_server_info")) : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolNames] };
+    return this.toolSchemas.has("get_mcp_server_info") ? parseToolResult(await this.call("get_mcp_server_info")) : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolSchemas.keys()] };
   }
   /** 根据工具 schema 选择节点参数，远程缺少文件定位或截图能力时拒绝猜测。 */
   async screenshot(target, nodeId) {
@@ -46738,8 +46736,9 @@ var catalogs = new Map(
     return [entry.id, { ...data, purpose: entry.purpose }];
   })
 );
-var LIBRARY_ID = "ant-design-vue-community";
-var getCatalog = (id = LIBRARY_ID) => {
+var ANT_LIBRARY_ID = "ant-design-vue-community";
+var getCatalog = (id) => {
+  if (!id) throw Error("LIBRARY_ID_REQUIRED");
   const catalog2 = catalogs.get(id);
   if (!catalog2) throw Error("LIBRARY_NOT_FOUND");
   return catalog2;
@@ -46762,7 +46761,7 @@ var summary = (family) => ({
   publishStatus: family.publishStatus ?? "unknown"
 });
 function searchLibrary({
-  libraryId = LIBRARY_ID,
+  libraryId,
   kind = "components",
   query = "",
   page,
@@ -46829,7 +46828,6 @@ function searchLibrary({
       components: p.components,
       componentSets: p.componentSets,
       role: p.components ? "components" : p.nodes > 1 ? "reference" : "separator",
-      sampledPublishStatus: p.sampledPublishStatus,
       publishStatuses: p.publishStatuses,
       ...page ? {
         referenceNodes: p.referenceNodes.slice(offset, offset + limit),
@@ -46843,7 +46841,7 @@ function searchLibrary({
     notice: "Catalog values are captured metadata. Native library access and imported versions must be verified; annotation instances do not create native comments."
   };
 }
-function selectLibraryVariant(familyId, variants = {}, componentProperties = {}, libraryId = LIBRARY_ID) {
+function selectLibraryVariant(libraryId, familyId, variants = {}, componentProperties = {}) {
   const catalog2 = getCatalog(libraryId);
   const family = catalog2.families.find((row) => row.id === familyId);
   if (!family) throw Error("LIBRARY_FAMILY_NOT_FOUND");
@@ -46887,13 +46885,10 @@ function selectLibraryVariant(familyId, variants = {}, componentProperties = {},
   };
 }
 function libraryRecommendation(semantic) {
-  const catalog2 = getCatalog();
-  const pages = { datePicker: "DatePicker", datepicker: "DatePicker" };
-  const page = catalog2.pages.find(
-    (p) => p.name.toLowerCase() === (pages[semantic] || semantic).toLowerCase()
-  );
+  const catalog2 = getCatalog(ANT_LIBRARY_ID);
+  const page = catalog2.pages.find((p) => p.name.toLowerCase() === semantic.toLowerCase());
   return page ? {
-    libraryId: LIBRARY_ID,
+    libraryId: ANT_LIBRARY_ID,
     page: page.name,
     components: page.components,
     status: page.components ? "catalogued-not-instanced" : "reference-only",
@@ -47710,7 +47705,7 @@ async function canvasRuntime(input2) {
 // src/project/inspect-project.js
 var import_yaml = __toESM(require_dist2(), 1);
 import { readFile as readFile2, readdir, realpath, stat, lstat } from "node:fs/promises";
-import { resolve, relative, join as join2, dirname, sep } from "node:path";
+import { resolve, relative, join as join2, sep } from "node:path";
 var DEFAULT_TOKENS = {
   colorPrimary: "#1677FF",
   colorText: "#000000",
@@ -47976,7 +47971,7 @@ var DesignService = class {
       const remote = this.upstream.mode === "remote", target = targetUrl ? parseLayerLink(targetUrl) : null;
       if (!remote && target)
         throw Error("REMOTE_MODE_REQUIRED: use pixso_connect with mode remote");
-      const server2 = this.upstream.info ? await this.upstream.info() : parseToolResult(await this.upstream.call("get_mcp_server_info"));
+      const server2 = await this.upstream.info();
       return {
         mode: remote ? "remote" : "local",
         server: server2,
@@ -48048,26 +48043,27 @@ var DesignService = class {
         (op) => op.op === "library-instance" ? {
           ...op,
           asset: selectLibraryVariant(
+            op.libraryId,
             op.familyId,
             op.variants,
-            op.componentProperties,
-            op.libraryId
+            op.componentProperties
           )
         } : op.op === "library-style" ? { ...op, asset: selectLibraryResource(op.libraryId, "styles", op.styleKey) } : op.op === "library-variable" ? { ...op, asset: selectLibraryResource(op.libraryId, "variables", op.variableKey) } : op
       );
-      if (operations.some((op) => op.op === "library-instance") && projectRoot) {
-        const project = await inspectProject(projectRoot);
-        for (const op of operations.filter((op2) => op2.op === "library-instance")) {
+      const libraryInstances = operations.filter((op) => op.op === "library-instance");
+      const hasMappedInstances = operations.some((op) => op.op === "instance");
+      if (hasMappedInstances && !projectRoot)
+        throw Error("MAPPING_REQUIRED: supply the project containing .pixso-codex.json");
+      const project = projectRoot && (libraryInstances.length || hasMappedInstances) ? await inspectProject(projectRoot) : null;
+      if (project) {
+        for (const op of libraryInstances) {
           const family = searchLibrary({ libraryId: op.libraryId, familyId: op.familyId });
           const semantic = family.page[0].toLowerCase() + family.page.slice(1);
           if (chooseComponent(semantic, project.config, project).provider === "project")
             throw Error("PROJECT_COMPONENT_PRIORITY: resolve the existing project wrapper first");
         }
       }
-      if (operations.some((op) => op.op === "instance")) {
-        if (!projectRoot)
-          throw Error("MAPPING_REQUIRED: supply the project containing .pixso-codex.json");
-        const project = await inspectProject(projectRoot);
+      if (hasMappedInstances) {
         checkedOperations = checkedOperations.map((op) => {
           if (op.op !== "instance") return op;
           if (!op.semantic)
@@ -48174,7 +48170,7 @@ var DesignService = class {
     return this.serial(async () => {
       const s = this.session(scopeToken);
       await this.evaluate({ action: "preview", scope: s.scope, nodeId });
-      const result = this.upstream.screenshot ? await this.upstream.screenshot(s.scope.remoteTarget, nodeId || s.scope.rootId) : await this.upstream.call("get_screenshot", { guid: nodeId || s.scope.rootId });
+      const result = await this.upstream.screenshot(s.scope.remoteTarget, nodeId || s.scope.rootId);
       parseToolResult(result);
       return result;
     });
@@ -48274,9 +48270,9 @@ register(
 );
 register(
   "pixso_library",
-  "\u53EA\u8BFB\u68C0\u7D22\u7EC4\u4EF6\u5E93\u3001\u516C\u53F8\u6837\u5F0F\u5E93\u4E0E\u6807\u6CE8\u5E93\u3002libraryId \u6307\u5B9A\u5E93\uFF0Ckind \u9009\u62E9 components/styles/variables\uFF1B\u6309 page/query \u67E5\u76EE\u5F55\uFF0CfamilyId \u67E5\u771F\u5B9E\u53D8\u4F53\u3002\u8FD4\u56DE\u771F\u5B9Ekey\u4E0E\u53D1\u5E03\u72B6\u6001\uFF0C\u76EE\u5F55\u547D\u4E2D\u4E0D\u4EE3\u8868\u5DF2\u5BFC\u5165\u3002",
+  "\u53EA\u8BFB\u68C0\u7D22\u8D44\u6E90\uFF0C\u4F7F\u7528\u987A\u5E8F\u4E3A\u8BBE\u8BA1\u6587\u4EF6 \u2192 UI/UX\u8BBE\u8BA1\u6807\u6CE8\u7CFB\u7EDF \u2192 Ant Design Vue (Community)\u3002libraryId \u5FC5\u586B\u5E76\u6307\u5B9A\u5E93\uFF0Ckind \u9009\u62E9 components/styles/variables\uFF1B\u6309 page/query \u67E5\u76EE\u5F55\uFF0CfamilyId \u67E5\u771F\u5B9E\u53D8\u4F53\u3002\u8FD4\u56DE\u771F\u5B9Ekey\u4E0E\u53D1\u5E03\u72B6\u6001\uFF0C\u76EE\u5F55\u547D\u4E2D\u4E0D\u4EE3\u8868\u5DF2\u5BFC\u5165\u3002",
   {
-    libraryId: nodeIdSchema.default("ant-design-vue-community"),
+    libraryId: nodeIdSchema,
     kind: external_exports.enum(["components", "styles", "variables"]).default("components"),
     query: external_exports.string().max(300).default(""),
     page: external_exports.string().max(200).optional(),

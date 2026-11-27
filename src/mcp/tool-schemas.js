@@ -70,7 +70,7 @@ export const patchOperationSchema = z.discriminatedUnion('op', [
       op: z.literal('library-instance'),
       ...base,
       familyId: nodeIdSchema,
-      libraryId: nodeIdSchema.default('ant-design-vue-community'),
+      libraryId: nodeIdSchema,
       fontSubstitutions: z
         .array(z.object({ from: font, to: font }).strict())
         .max(32)

@@ -20,6 +20,30 @@ test('stdio server exposes scoped tools, validates patches, and can inspect a pr
     assert.ok(names.includes('pixso_patch'));
     assert.ok(names.includes('pixso_begin'));
     assert.ok(!names.includes('eval_script'));
+    // 三库共存时禁止缺失 libraryId 的历史调用，避免把同一节点 ID 解析到错误库。
+    for (const [name, args] of [
+      ['pixso_library', { page: 'Button' }],
+      [
+        'pixso_patch',
+        {
+          scopeToken: 'not-real',
+          expectedRevision: 'old',
+          operations: [
+            { op: 'library-instance', key: 'button', parentId: '1:2', familyId: '144:5014' },
+          ],
+        },
+      ],
+    ]) {
+      const rejected = await c.callTool({ name, arguments: args });
+      assert.equal(rejected.isError, true);
+      assert.match(rejected.content[0].text, /libraryId/);
+    }
+    const library = await c.callTool({
+      name: 'pixso_library',
+      arguments: { libraryId: 'ant-design-vue-community', page: 'Button', limit: 1 },
+    });
+    assert.notEqual(library.isError, true);
+    assert.equal(library.structuredContent.libraryId, 'ant-design-vue-community');
     const project = await c.callTool({
       name: 'inspect_vue_project',
       arguments: { projectRoot: process.cwd() },

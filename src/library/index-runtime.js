@@ -9,8 +9,7 @@ export async function indexLibraryRuntime(expectedFileKey) {
     let nodes = 0,
       components = 0,
       sets = 0,
-      instances = 0,
-      sample = null;
+      instances = 0;
     const publishStatuses = {};
     const stack = [page];
     while (stack.length) {
@@ -34,7 +33,6 @@ export async function indexLibraryRuntime(expectedFileKey) {
             ? await n.getPublishStatusAsync()
             : 'unknown';
         publishStatuses[publishStatus] = (publishStatuses[publishStatus] || 0) + 1;
-        sample ??= { id: n.id, status: publishStatus };
         const variants = (n.type === 'COMPONENT_SET' ? n.children : [n])
           .filter((c) => c.type === 'COMPONENT')
           .map((c) => ({
@@ -67,8 +65,6 @@ export async function indexLibraryRuntime(expectedFileKey) {
       componentSets: sets,
       instances,
       publishStatuses,
-      sampledPublishStatus: sample?.status ?? 'not-applicable',
-      sampledComponentId: sample?.id ?? null,
       referenceNodes: page.children
         .filter((n) => n.type !== 'TEXT')
         .map((n) => ({ id: n.id, name: n.name, type: n.type })),

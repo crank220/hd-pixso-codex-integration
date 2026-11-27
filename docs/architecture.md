@@ -19,7 +19,7 @@ tests/
   integration/          服务、真实 stdio、模拟远程与 OAuth 测试
   fixtures/             最小合成 Plugin API，不包含公司设计内容
   schemas/              用于发布校验的第三方 JSON schema
-scripts/                构建、诊断、只读 smoke、打包与包验收
+scripts/                构建、目录采集、只读 smoke、打包与包验收
 examples/               可复制到业务项目的配置示例
 skills/hd-design/       设计工作流、参考规则与授权分发的检索数据
 assets/                 插件图标与全页组件元数据目录
@@ -69,3 +69,5 @@ node scripts/test-package.js
 ZIP 仅包含清单指定的安装文件和文档。解压验收会从临时目录启动服务、核对协议版本与工具、执行内置检索，并排除源码、开发依赖、缓存与凭据文件。真实远程账号读写仍需单独授权联调，模拟协议通过不表示真实远程编辑已经验证。
 
 公司资源通过 assets/libraries/registry.json 注册；每库独立目录，libraryId+真实key解析组件、样式与变量。目录解析在Node服务层，原生导入、授权范围应用、引用/属性读回及补偿仍由canvas-runtime执行；共享资源主定义只读。
+
+0.5.0 起资源查询和实例必须显式携带 libraryId，删除历史 Ant 默认选库、抽样发布字段以及服务内直接调用本地上游工具的分支。DesignService 统一依赖上游 info/evaluate/screenshot 接口；连接差异仅由 PixsoUpstream 处理。批次内项目检查只执行一次，组件优先级使用同一份证据。

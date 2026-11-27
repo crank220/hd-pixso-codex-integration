@@ -6,12 +6,14 @@ import { fakePixso } from '../fixtures/pixso.js';
 import { DesignService } from '../../src/design/design-service.js';
 import { selectLibraryVariant, searchLibrary } from '../../src/library/catalog.js';
 
-const buttonId = searchLibrary({ page: 'Button' }).families.find(
-  (f) => f.name === 'Button',
-).familyId;
-const asset = selectLibraryVariant(buttonId);
+const buttonId = searchLibrary({
+  libraryId: 'ant-design-vue-community',
+  page: 'Button',
+}).families.find((f) => f.name === 'Button').familyId;
+const asset = selectLibraryVariant('ant-design-vue-community', buttonId);
 const op = {
   op: 'library-instance',
+  libraryId: 'ant-design-vue-community',
   key: 'button',
   parentId: '1:2',
   familyId: buttonId,

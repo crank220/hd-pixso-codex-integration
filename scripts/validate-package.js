@@ -19,14 +19,22 @@ for (const item of Object.values(lock.packages || {})) {
     throw Error('Dependency lock contains a non-public registry URL');
 }
 const manifest = await readJson('plugin.json');
+const codexManifest = await readJson('.codex-plugin/plugin.json');
 const pkg = await readJson('package.json');
 if (
   manifest.version !== pkg.version ||
-  (await readJson('.codex-plugin/plugin.json')).version !== pkg.version ||
+  codexManifest.version !== pkg.version ||
   lock.version !== pkg.version ||
   lock.packages[''].version !== pkg.version
 )
   throw Error('Version mismatch');
+// 两种安装入口必须显示同一名称与简介，避免发布后仍出现历史品牌文案。
+if (
+  manifest.extensions['com.openai'].interface.displayName !== codexManifest.interface.displayName ||
+  manifest.description !== codexManifest.description ||
+  manifest.description !== pkg.description
+)
+  throw Error('Plugin display metadata mismatch');
 const market = await readJson('.agents/plugins/marketplace.json');
 if (!market.plugins.some((p) => p.name === manifest.name && p.source.path === './'))
   throw Error('Marketplace entry is missing');

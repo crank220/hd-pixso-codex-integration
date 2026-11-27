@@ -1,8 +1,8 @@
 {
   "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
   "name": "hd-pixso-codex",
-  "version": "0.4.0",
-  "description": "本地/远程 Pixso 设计，接入 Ant Design Vue、公司品牌样式和 UI/UX 标注组件及变量，按授权范围原生复用。",
+  "version": "0.5.0",
+  "description": "HD Codex + Pixso 双向工作流：支持本地/远程连接、组件与品牌样式复用、图层精修及公司 UI/UX 标注。",
   "author": {
     "name": "crank220",
     "url": "https://github.com/crank220"
@@ -19,8 +19,8 @@
   "extensions": {
     "com.openai": {
       "interface": {
-        "displayName": "Codex + Pixso 双窗口设计",
-        "shortDescription": "本地/远程设计、图层精修与公司交互标注",
+        "displayName": "HD Codex + Pixso 双向工作流",
+        "shortDescription": "读取 Pixso 最新调整，按范围复用组件、精修图层与标注",
         "longDescription": "支持本地 Pixso Desktop MCP 和官方远程 MCP OAuth/图层链接。内置 UI/UX Pro Max 检索，复用项目组件，按范围与快照校验修改，统一图标状态并在画板外使用公司规范标注。需要 Node.js20+；远程账户权限和工具版本须实际核对。",
         "developerName": "crank220",
         "category": "Creativity",

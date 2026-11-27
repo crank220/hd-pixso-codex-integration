@@ -25,4 +25,4 @@ https://pixso.cn/app/design/<fileKey>?item-id=123%3A456
 - https://pixso.cn/developer/zh/mcp/remote-mcp.html
 - https://pixso.cn/developer/zh/mcp/tools.html
 
-本地 `pixso_begin({pageName:"03 控件差异与交互"})` 精确匹配当前文件的唯一页面，不改变设计师的活动页。重名返回 PAGE_NAME_AMBIGUOUS，缺失返回 PAGE_NAME_MISMATCH；一个 token 只绑定一个页面/子树。未传 pageName 的旧流程仍在切换活动页后拒写。
+本地 `pixso_begin({pageName:"03 控件差异与交互"})` 精确匹配当前文件的唯一页面，不改变设计师的活动页。重名返回 PAGE_NAME_AMBIGUOUS，缺失返回 PAGE_NAME_MISMATCH；一个 token 只绑定一个页面/子树。未传 pageName 时仍在切换活动页后拒写。

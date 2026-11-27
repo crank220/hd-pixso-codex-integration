@@ -20,7 +20,7 @@ export function validateEndpoint(value) {
     throw Error('INVALID_ENDPOINT: expected a plain local HTTP MCP URL');
   return url;
 }
-/** 兼容结构化/文本结果；原生错误或 verified=false 必须继续向调用方报错。 */
+/** 解析 MCP 的结构化或文本内容；原生错误或 verified=false 必须向调用方报错。 */
 export function parseToolResult(result) {
   const text = (result?.content || [])
     .filter((c) => c.type === 'text')
@@ -72,13 +72,11 @@ export class PixsoUpstream {
           inventory.push(...batch.tools);
           cursor = batch.nextCursor;
         } while (cursor);
-        const tools = { tools: inventory };
-        if (!tools.tools.some((t) => t.name === 'eval_script'))
+        if (!inventory.some((t) => t.name === 'eval_script'))
           throw Error(
             'PIXSO_EVAL_UNAVAILABLE: connected server must provide editable eval_script capability',
           );
-        this.toolSchemas = new Map(tools.tools.map((t) => [t.name, t]));
-        this.toolNames = new Set(tools.tools.map((t) => t.name));
+        this.toolSchemas = new Map(inventory.map((t) => [t.name, t]));
         this.client = client;
         return client;
       } catch (e) {
@@ -93,7 +91,7 @@ export class PixsoUpstream {
   }
   async call(name, args = {}) {
     const client = await this.connect();
-    if (!this.toolNames.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
+    if (!this.toolSchemas.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
     // 超时不代表未写入；自动重试可能重复创建图层，恢复前必须由调用方读回。
     return client.callTool({ name, arguments: args }, undefined, { timeout: 60000 });
   }
@@ -112,9 +110,9 @@ export class PixsoUpstream {
   }
   async info() {
     await this.connect();
-    return this.toolNames.has('get_mcp_server_info')
+    return this.toolSchemas.has('get_mcp_server_info')
       ? parseToolResult(await this.call('get_mcp_server_info'))
-      : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolNames] };
+      : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolSchemas.keys()] };
   }
   /** 根据工具 schema 选择节点参数，远程缺少文件定位或截图能力时拒绝猜测。 */
   async screenshot(target, nodeId) {

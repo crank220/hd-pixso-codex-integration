@@ -1,6 +1,6 @@
 // 只读核对 Vue 项目、锁定依赖版本与组件映射，优先复用项目已有组件。
 import { readFile, readdir, realpath, stat, lstat } from 'node:fs/promises';
-import { resolve, relative, join, dirname, sep } from 'node:path';
+import { resolve, relative, join, sep } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 import { z } from 'zod';
 

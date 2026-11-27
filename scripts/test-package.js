@@ -50,7 +50,7 @@ try {
     throw Error('Packaged component resolver failed');
   const library = await client.callTool({
     name: 'pixso_library',
-    arguments: { page: 'Button', limit: 1 },
+    arguments: { libraryId: 'ant-design-vue-community', page: 'Button', limit: 1 },
   });
   if (
     library.isError ||

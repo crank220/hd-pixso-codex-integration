@@ -191,16 +191,22 @@ test('all registered libraries retain page coverage and resources cannot be reso
   assert.equal(searchLibrary({ libraryId: 'hd-company-styles' }).coverage.pages, 1);
   assert.equal(searchLibrary({ libraryId: 'hd-annotations' }).coverage.pages, 4);
   assert.equal(searchLibrary({ libraryId: 'hd-annotations' }).coverage.families, 9);
-  assert.equal(company.libraries.length, 3);
+  assert.deepEqual(
+    company.libraries.map((library) => library.id),
+    ['hd-company-styles', 'hd-annotations', 'ant-design-vue-community'],
+  );
   const marker = selectLibraryVariant(
+    'hd-annotations',
     '14:3128',
     { 应用场景: '功能说明（蓝）', 样式: '数字' },
     {},
-    'hd-annotations',
   );
   assert.equal(marker.libraryId, 'hd-annotations');
   assert.equal(marker.key, '0b174a0f50bb0ea85a477f326bff6bf2146cf925');
-  assert.throws(() => selectLibraryVariant('14:3128'), /LIBRARY_FAMILY_NOT_FOUND/);
+  assert.throws(
+    () => selectLibraryVariant('ant-design-vue-community', '14:3128'),
+    /LIBRARY_FAMILY_NOT_FOUND/,
+  );
   assert.throws(
     () => selectLibraryResource('hd-annotations', 'styles', brand.key),
     /LIBRARY_RESOURCE_NOT_FOUND/,

@@ -19167,13 +19167,11 @@ var PixsoUpstream = class {
           inventory.push(...batch.tools);
           cursor = batch.nextCursor;
         } while (cursor);
-        const tools = { tools: inventory };
-        if (!tools.tools.some((t) => t.name === "eval_script"))
+        if (!inventory.some((t) => t.name === "eval_script"))
           throw Error(
             "PIXSO_EVAL_UNAVAILABLE: connected server must provide editable eval_script capability"
           );
-        this.toolSchemas = new Map(tools.tools.map((t) => [t.name, t]));
-        this.toolNames = new Set(tools.tools.map((t) => t.name));
+        this.toolSchemas = new Map(inventory.map((t) => [t.name, t]));
         this.client = client;
         return client;
       } catch (e) {
@@ -19189,7 +19187,7 @@ var PixsoUpstream = class {
   }
   async call(name, args = {}) {
     const client = await this.connect();
-    if (!this.toolNames.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
+    if (!this.toolSchemas.has(name)) throw Error(`PIXSO_TOOL_UNAVAILABLE: ${name}`);
     return client.callTool({ name, arguments: args }, void 0, { timeout: 6e4 });
   }
   /** 仅供内部范围引擎调用；远程必须携带图层链接解析出的文件定位信息。 */
@@ -19207,7 +19205,7 @@ var PixsoUpstream = class {
   }
   async info() {
     await this.connect();
-    return this.toolNames.has("get_mcp_server_info") ? parseToolResult(await this.call("get_mcp_server_info")) : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolNames] };
+    return this.toolSchemas.has("get_mcp_server_info") ? parseToolResult(await this.call("get_mcp_server_info")) : { ...this.client.getServerVersion(), mode: this.mode, tools: [...this.toolSchemas.keys()] };
   }
   /** 根据工具 schema 选择节点参数，远程缺少文件定位或截图能力时拒绝猜测。 */
   async screenshot(target, nodeId) {

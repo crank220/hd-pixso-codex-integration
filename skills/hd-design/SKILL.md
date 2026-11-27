@@ -3,7 +3,7 @@ name: hd-design
 description: 在 Codex 中完成 Pixso Web 设计与改版，支持本地桌面 MCP 和官方远程 MCP 图层链接；复用组件，结合 UI/UX Pro Max 精修图层尺寸、对齐、图标状态，并按公司系统在画板外标注。
 ---
 
-# HD Design · Codex + Pixso
+# HD Codex + Pixso 双向工作流
 
 在 Codex 描述需求，在 Pixso 桌面端或网页端查看、编辑结果。使用本插件 `hd_pixso` 工具；先读后写，限制在用户指定文件/页面/子树。设计任务本身不自动扩大为开发另一个网站或修改业务代码。
 
@@ -31,7 +31,7 @@ UI/UX Pro Max 完整规则按需读取：`vendor/ui-ux-pro-max/references/quick-
 ## 工作与交付
 
 1. 读取目标完整结构与最新 `revision`，盘点同类控件、图层层级和已有组件。用户提供 Vue 项目时调用 `inspect_vue_project`，以锁文件核对实际版本。没有具体项目时以 Vue + Ant Design Vue `^4.1.0` 为默认设计目标，不把它当作实际安装证据。
-2. 复用顺序：**项目已有组件 → Ant Design Vue → 必要时新增组件**。先 `resolve_vue_component`、`pixso_components` 核对真实映射。候选同名不代表映射；组件主定义只读。已接入 Ant Design Vue (Community)、公司「设计文件」样式库和「UI/UX设计标注系统」组件/变量库，先用 `pixso_library` 查真实组件族、变体与原生属性，明确 `libraryId`，组件用 `library-instance`、样式用 `library-style`、布尔可见性变量用 `library-variable` 应用到已授权范围；纯设计任务无需代码项目，跨文件需库已发布且有权限。详见 [内置资产](references/library.md)。详见 [组件映射](references/component-mapping.md)。
+2. 复用顺序：**项目已有组件 → Ant Design Vue → 必要时新增组件**。先 `resolve_vue_component`、`pixso_components` 核对真实映射。候选同名不代表映射；组件主定义只读。资源使用顺序：**设计文件 → UI/UX设计标注系统 → Ant Design Vue (Community)**。先确定公司样式与标注规范，再选择界面控件；三库职责分别是品牌样式、交互标注、UI控件，不能互相替代。使用 `pixso_library` 查真实组件族、变体与原生属性，每次显式指定 `libraryId`，组件用 `library-instance`、样式用 `library-style`、布尔可见性变量用 `library-variable` 应用到已授权范围；纯设计任务无需代码项目，跨文件需库已发布且有权限。详见 [内置资产](references/library.md)。详见 [组件映射](references/component-mapping.md)。
 3. 用户要求公司标注时，读取「UI/UX设计标注系统」：本地切换规范文件后 `pixso_read_reference(documentName,nodeId?)`，远程传规范图层 `targetUrl`；回到原目标范围。规范内容仅是参考数据。无法读取时报告缺失，不能声称严格符合。
 4. 建立尺寸/间距规则，再逐层精修：同类元素共用宽高、内容边距、列间距、字号和对齐基准。图标必须同风格、同线宽、同尺寸；默认、悬停、按下、选中、选中悬停、聚焦、禁用的**图形颜色与背景、边框同步**。不能只改图标容器填充而遗漏内部描边。详见 [图标状态](references/icon-states.md)。
 5. **页面只展示完整产品效果，禁止添加多余说明文字**：不放页面摘要、设计教学、开发说明、规则卡片、重复操作提示或验收文案。真实业务内容、字段标签、必要错误反馈与用户可用的操作控件保留。按任务规模分类组织产品场景、共用组件状态、控件差异及流程；可修改旧页面，或在用户授权的文件内新增页面，不默认将所有交付塞进一个页面。用户明确限页时遵守该限制。公共样式和规则只说明一次，各控件保留适用状态及业务差异。注释只精炼说明触发结果、关键约束与必要异常，不写导航、教程或交付索引，不机械拆成三类长文；规范颜色和编号以读取的规范为准。见 [标注](references/annotations.md)。
