@@ -42,6 +42,9 @@ const base = {
   parentId: nodeIdSchema,
   props: layerPropsSchema.default({}),
 };
+const font = z
+  .object({ family: z.string().min(1).max(200), style: z.string().min(1).max(200) })
+  .strict();
 /** 严格区分声明式操作；不暴露任意脚本、删除、跨页移动或全局样式写入口。 */
 export const patchOperationSchema = z.discriminatedUnion('op', [
   z
@@ -49,6 +52,10 @@ export const patchOperationSchema = z.discriminatedUnion('op', [
       op: z.literal('library-instance'),
       ...base,
       familyId: nodeIdSchema,
+      fontSubstitutions: z
+        .array(z.object({ from: font, to: font }).strict())
+        .max(32)
+        .default([]),
       variants: z.record(z.string().max(200), z.string().max(300)).default({}),
       componentProperties: z
         .record(z.string().max(300), z.union([z.string().max(20000), z.boolean()]))

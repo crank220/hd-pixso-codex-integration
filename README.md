@@ -66,7 +66,7 @@ $hd-design
 
 ## 插件能力
 
-在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.3.0 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.3.1 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
 - 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
 - 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
@@ -87,9 +87,11 @@ $hd-design
 按需求选择尺寸和状态，文本使用组件原生属性覆盖；保留我已有的修改。
 ```
 
-`pixso_library` 可离线查询目录；`pixso_patch` 的 `library-instance` 操作校验真实变体、创建原生实例并读回。纯设计无需配置 Vue 项目；若连接代码项目，继续优先复用业务组件。详见[资产使用与示例](skills/hd-design/references/library.md)。
+`pixso_library` 可离线查询目录及采集时的组件族发布状态；`pixso_patch` 的 `library-instance` 操作校验真实变体、创建原生实例并读回。纯设计无需配置 Vue 项目；若连接代码项目，继续优先复用业务组件。详见[资产使用与示例](skills/hd-design/references/library.md)。
 
-**接入边界：** 包内是资产目录与绑定信息，完整可编辑组件由 Pixso 原生库提供。同源文件可以按真实组件创建实例；跨文件导入要求组件已发布且账号有访问权限。采集时组件页抽样均为 `UNPUBLISHED`，需先在 Pixso 发布并开放给使用者后才能跨文件导入。目录覆盖不等于已完成所有变体的真实导入验证；不会自动发布或改动源库。主题自动同步、全部组件 API 核验不属于本次资产接入。
+**接入边界：** 包内是资产目录与绑定信息，完整可编辑组件由 Pixso 原生库提供。同源文件可以按真实组件创建实例；跨文件导入要求组件已发布且账号有访问权限。2026-11-27 按发布单位逐项核对：1011 个组件族已发布，`_cursorHandLine`、`_Slot` 两个辅助组件未发布。真实跨文件已验证 13 个原生实例（按钮六种状态、图标按钮四种状态、日期输入框、表格单元格及线性图标），未逐一创建所有 5007 个变体；远程账号仍待联调。不会自动发布或改动源库。主题自动同步、全部组件 API 核验不属于本次资产接入。
+
+源库含 `SF Pro` 字体。当前账号缺少源字体时，0.3.1 支持显式 `fontSubstitutions`，仅覆盖新建实例，并校验字号、行高、字距和颜色未改变；不静默替换字体。示例见[字体映射](skills/hd-design/references/library.md#字体映射)。
 
 ## 安装与升级
 
@@ -100,7 +102,7 @@ codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-已安装用户在 Codex 插件管理中刷新来源、更新至 **0.3.0**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.3.1**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
 ## 选择连接模式
 

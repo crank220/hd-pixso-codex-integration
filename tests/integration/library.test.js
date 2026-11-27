@@ -74,6 +74,134 @@ test('built-in assets create real instances without a Vue project and preserve t
   assert.equal(t.c.characters, '');
 });
 
+test('explicit font substitutions affect only new instances and load the requested replacement', async () => {
+  const t = setup();
+  const label = t.p.createText();
+  label.fontName = { family: 'SF Pro', style: 'Regular' };
+  label.textStyleId = 'shared-source-style';
+  t.c.appendChild(label);
+  const create = t.c.createInstance;
+  t.c.createInstance = () => {
+    const n = create();
+    const text = n.children[0];
+    text.setRangeFontName = (start, end, font) => {
+      assert.equal(text.textStyleId, '');
+      assert.equal(font.hash, 'native-cloud-font');
+      assert.equal(start, 0);
+      assert.equal(end, text.characters.length);
+      text.fontName = font;
+    };
+    text.characters = 'Button';
+    return n;
+  };
+  t.p.listAvailableFontsAsync = async () => [
+    { fontName: { family: 'Noto Sans SC', style: 'Regular', hash: 'native-cloud-font' } },
+  ];
+  const loaded = [];
+  t.p.loadFontAsync = async (font) => {
+    loaded.push(font.family);
+    if (font.family === 'SF Pro') throw Error('Missing source font');
+  };
+  const s = await t.service.begin({});
+  await assert.rejects(
+    t.service.patch({ scopeToken: s.scopeToken, expectedRevision: s.revision, operations: [op] }),
+    /FONT_UNAVAILABLE.*SF Pro/,
+  );
+  const r = await t.service.patch({
+    scopeToken: s.scopeToken,
+    expectedRevision: s.revision,
+    operations: [
+      {
+        ...op,
+        componentProperties: { 'Text#144:0': '确认' },
+        fontSubstitutions: [
+          {
+            from: { family: 'SF Pro', style: 'Regular' },
+            to: { family: 'Noto Sans SC', style: 'Regular' },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(r.verified, true);
+  const instance = t.p.getNodeById(r.created.button);
+  assert.equal(instance.children[0].fontName.family, 'Noto Sans SC');
+  assert.equal(label.fontName.family, 'SF Pro');
+  assert.equal(label.textStyleId, 'shared-source-style');
+  assert.equal(r.libraryInstances.button.fontSubstitutions[0].count, 1);
+  assert.deepEqual(loaded, ['SF Pro', 'Noto Sans SC']);
+});
+
+test('font substitution rejects mixed text without altering existing content', async () => {
+  const t = setup();
+  const label = t.p.createText();
+  label.fontName = t.p.mixed;
+  label.getStyledTextSegments = () => [];
+  t.c.appendChild(label);
+  const s = await t.service.begin({});
+  const operation = {
+    ...op,
+    fontSubstitutions: [
+      {
+        from: { family: 'SF Pro', style: 'Regular' },
+        to: { family: 'Noto Sans SC', style: 'Regular' },
+      },
+    ],
+  };
+  await assert.rejects(
+    t.service.patch({
+      scopeToken: s.scopeToken,
+      expectedRevision: s.revision,
+      operations: [operation],
+    }),
+    /LIBRARY_MIXED_FONT_SUBSTITUTION_UNSUPPORTED/,
+  );
+  assert.equal(t.p.getNodeById('1:2').children.length, 1);
+});
+
+test('native instance font rejection fails readback and restores the target', async () => {
+  const t = setup();
+  const label = t.p.createText();
+  label.fontName = { family: 'SF Pro', style: 'Regular' };
+  t.c.appendChild(label);
+  const create = t.c.createInstance;
+  t.c.createInstance = () => {
+    const n = create();
+    const set = n.setProperties;
+    n.setProperties = (props) => {
+      set(props);
+      Object.defineProperty(n.children[0], 'fontName', {
+        get: () => ({ family: 'SF Pro', style: 'Regular' }),
+        set() {},
+        configurable: true,
+      });
+    };
+    return n;
+  };
+  const s = await t.service.begin({});
+  const result = await t.service.patch({
+    scopeToken: s.scopeToken,
+    expectedRevision: s.revision,
+    operations: [
+      {
+        ...op,
+        componentProperties: { 'Text#144:0': '确认' },
+        fontSubstitutions: [
+          {
+            from: { family: 'SF Pro', style: 'Regular' },
+            to: { family: 'Noto Sans SC', style: 'Regular' },
+          },
+        ],
+      },
+    ],
+  });
+  assert.equal(result.status, 'failed');
+  assert.match(result.failure, /LIBRARY_FONT_READBACK_MISMATCH/);
+  assert.equal(result.rollback.verified, true);
+  assert.equal(t.p.getNodeById('1:2').children.length, 1);
+  assert.equal(label.fontName.family, 'SF Pro');
+});
+
 test('out-of-scope or invalid combinations are rejected before importing a dependency', async () => {
   const t = setup(),
     s = await t.service.begin({ rootId: '1:2' });

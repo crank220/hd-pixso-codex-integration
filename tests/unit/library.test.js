@@ -2,10 +2,55 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+import { indexLibraryRuntime } from '../../src/library/index-runtime.js';
 import { searchLibrary, selectLibraryVariant } from '../../src/library/catalog.js';
 const catalog = JSON.parse(
   readFileSync(new URL('../../assets/libraries/ant-design-vue.json', import.meta.url)),
 );
+
+test('publication is read from component families instead of unpublished variant children', async () => {
+  const page = { id: 'page', name: 'Button', type: 'PAGE', children: [] };
+  const family = {
+    id: 'family',
+    name: 'Button',
+    type: 'COMPONENT_SET',
+    key: 'family-key',
+    parent: page,
+    componentPropertyDefinitions: {},
+    children: [],
+    getPublishStatusAsync: async () => 'CURRENT',
+  };
+  const variant = {
+    id: 'variant',
+    name: 'default',
+    type: 'COMPONENT',
+    key: 'variant-key',
+    parent: family,
+    getPublishStatusAsync: async () => {
+      throw Error('Variant status is not family publication');
+    },
+  };
+  const helper = {
+    id: 'helper',
+    name: '_helper',
+    type: 'COMPONENT',
+    key: 'helper-key',
+    parent: page,
+    getPublishStatusAsync: async () => 'UNPUBLISHED',
+  };
+  family.children.push(variant);
+  page.children.push(family, helper);
+  const result = await vm.runInNewContext(`(${indexLibraryRuntime.toString()})('source')`, {
+    pixso: { fileKey: 'source', root: { name: 'Library', children: [page] } },
+  });
+  assert.equal(result.families.find((f) => f.id === 'family').publishStatus, 'CURRENT');
+  assert.equal(result.families.find((f) => f.id === 'helper').publishStatus, 'UNPUBLISHED');
+  assert.deepEqual(JSON.parse(JSON.stringify(result.pages[0].publishStatuses)), {
+    UNPUBLISHED: 1,
+    CURRENT: 1,
+  });
+});
 
 test('catalog accounts for every source page and all native component definitions', () => {
   const index = searchLibrary({ limit: 1 });

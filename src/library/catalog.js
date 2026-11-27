@@ -13,6 +13,7 @@ const summary = (family) => ({
   page: family.page,
   type: family.type,
   variantCount: family.variants.length,
+  publishStatus: family.publishStatus ?? 'unknown',
 });
 
 /** 分页返回目录，显式 familyId 才返回属性定义与变体，避免一次输出整个组件库。 */
@@ -43,6 +44,11 @@ export function searchLibrary({ query = '', page, familyId, offset = 0, limit = 
       pages: catalog.pages.length,
       families: catalog.families.length,
       variants: catalog.families.reduce((sum, f) => sum + f.variants.length, 0),
+      publication: catalog.families.reduce((counts, f) => {
+        const status = f.publishStatus ?? 'unknown';
+        counts[status] = (counts[status] || 0) + 1;
+        return counts;
+      }, {}),
     },
     pages: catalog.pages
       .filter((p) => !page || p.name.toLowerCase() === page.toLowerCase())
@@ -53,6 +59,7 @@ export function searchLibrary({ query = '', page, familyId, offset = 0, limit = 
         componentSets: p.componentSets,
         role: p.components ? 'components' : p.nodes > 1 ? 'reference' : 'separator',
         sampledPublishStatus: p.sampledPublishStatus,
+        publishStatuses: p.publishStatuses,
         ...(page
           ? {
               referenceNodes: p.referenceNodes.slice(offset, offset + limit),

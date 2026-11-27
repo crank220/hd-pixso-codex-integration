@@ -437,6 +437,24 @@ export async function canvasRuntime(input) {
         )
           fail('LIBRARY_INSTANCE_TEXT_PROPERTY_REQUIRED');
         type = 'INSTANCE';
+        const substitutions = op.fontSubstitutions || [];
+        const seen = new Set();
+        for (const sub of substitutions) {
+          if (
+            [sub.from, sub.to].some(
+              (f) =>
+                !f ||
+                typeof f.family !== 'string' ||
+                !f.family ||
+                typeof f.style !== 'string' ||
+                !f.style,
+            )
+          )
+            fail('INVALID_FONT_SUBSTITUTION');
+          const key = JSON.stringify([sub.from.family, sub.from.style]);
+          if (seen.has(key)) fail('DUPLICATE_FONT_SUBSTITUTION');
+          seen.add(key);
+        }
       } else if (op.op === 'insert') {
         type = { frame: 'FRAME', rectangle: 'RECTANGLE', text: 'TEXT' }[op.kind];
         if (!type) fail('INVALID_KIND');
@@ -491,25 +509,53 @@ export async function canvasRuntime(input) {
   }
   // 字体加载会让出执行权；此期间用户可能改稿，异步完成后必须再次比较完整快照。
   const fontSet = new Map();
-  function collectFonts(n) {
+  const availableFonts = new Map();
+  const sameFont = (a, b) => a?.family === b?.family && a?.style === b?.style;
+  function collectFonts(n, substitutions = []) {
+    if (n.type === 'TEXT' && n.fontName === api.mixed && substitutions.length)
+      fail('LIBRARY_MIXED_FONT_SUBSTITUTION_UNSUPPORTED', n.id);
     if (n.type === 'TEXT' && n.fontName && n.fontName !== api.mixed) {
-      const f = { family: n.fontName.family, style: n.fontName.style };
+      const replacement = substitutions.find((s) => sameFont(n.fontName, s.from))?.to || n.fontName;
+      const f = { family: replacement.family, style: replacement.style };
       fontSet.set(JSON.stringify(f), f);
     }
-    if (n.children) n.children.forEach(collectFonts);
+    if (n.children) n.children.forEach((child) => collectFonts(child, substitutions));
   }
   for (const op of operations) {
     if (op.op === 'update' && !op.nodeId.startsWith('$')) collectFonts(get(op.nodeId));
     if (op.op === 'clone') collectFonts(get(op.sourceId));
     if (op.op === 'instance') collectFonts(get(op.componentId));
-    if (op.op === 'library-instance') collectFonts(librarySources.get(op.key));
+    if (op.op === 'library-instance')
+      collectFonts(librarySources.get(op.key), op.fontSubstitutions);
     if (op.op === 'insert' && op.kind === 'text') {
       const f = { family: 'Noto Sans SC', style: 'Regular' };
       fontSet.set(JSON.stringify(f), f);
     }
     if (op.props?.fontName) fontSet.set(JSON.stringify(op.props.fontName), op.props.fontName);
   }
-  await Promise.all([...fontSet.values()].map((f) => api.loadFontAsync(f)));
+  if (
+    operations.some((op) => op.fontSubstitutions?.length) &&
+    typeof api.listAvailableFontsAsync === 'function'
+  ) {
+    for (const font of await api.listAvailableFontsAsync())
+      availableFonts.set(
+        JSON.stringify([font.fontName.family, font.fontName.style]),
+        plain(font.fontName),
+      );
+  }
+  const resolveFont = (f) => availableFonts.get(JSON.stringify([f.family, f.style])) || f;
+  await Promise.all(
+    [...fontSet.values()].map(async (f) => {
+      try {
+        await api.loadFontAsync(resolveFont(f));
+      } catch (e) {
+        fail(
+          'FONT_UNAVAILABLE',
+          `${f.family}/${f.style}; specify an available fontSubstitutions mapping. ${String(e)}`,
+        );
+      }
+    }),
+  );
   if (identity() !== scope.documentIdentity) fail('DOCUMENT_CHANGED');
   if ((target || scope.explicitPage ? page.id : api.currentPage.id) !== scope.pageId)
     fail('PAGE_CHANGED');
@@ -621,27 +667,72 @@ export async function canvasRuntime(input) {
         if (n.type === 'TEXT' && op.op === 'insert')
           n.fontName = { family: 'Noto Sans SC', style: 'Regular' };
         if (op.op === 'library-instance') {
+          // 字体映射只覆盖刚创建的实例，源组件及其其他实例不受影响。
+          const changes = [];
+          function substituteFonts(node) {
+            if (node.type === 'TEXT') {
+              const sub = (op.fontSubstitutions || []).find((s) => sameFont(node.fontName, s.from));
+              if (sub) {
+                // 字体来自共享文字样式时，在新实例上解除文字样式引用后再覆盖；不编辑共享样式。
+                const typography = Object.fromEntries(
+                  ['fontSize', 'lineHeight', 'letterSpacing', 'fills']
+                    .filter((key) => node[key] !== undefined)
+                    .map((key) => [key, plain(node[key])]),
+                );
+                if (node.textStyleId) node.textStyleId = '';
+                // 使用 Pixso 返回的字体身份（含云字体 hash），按完整文字范围写入实例覆盖。
+                const font = resolveFont(sub.to);
+                if (node.characters.length && typeof node.setRangeFontName === 'function')
+                  node.setRangeFontName(0, node.characters.length, font);
+                else node.fontName = font;
+                changes.push({ node, sub, typography });
+              }
+            }
+            if (node.children) node.children.forEach(substituteFonts);
+          }
           const overrides = op.asset.componentProperties || {};
           if (Object.keys(overrides).length) {
             if (typeof n.setProperties !== 'function') fail('LIBRARY_PROPERTIES_UNAVAILABLE');
             const native = n.componentProperties || {};
             for (const [key, value] of Object.entries(overrides)) {
               if (!native[key] || native[key].type !== op.asset.propertyDefinitions[key].type)
-                fail('LIBRARY_PROPERTY_CHANGED', key);
+                fail(
+                  'LIBRARY_PROPERTY_CHANGED',
+                  `${op.key}.${key}; available: ${Object.keys(native).join(', ')}`,
+                );
             }
             n.setProperties(overrides);
             for (const [key, value] of Object.entries(overrides))
               if (n.componentProperties?.[key]?.value !== value) fail('READBACK_MISMATCH', key);
           }
+          // Pixso setProperties 可重置文字样式；原生属性覆盖后重新应用显式字体映射。
+          substituteFonts(n);
           if (n.type !== 'INSTANCE' || n.mainComponent?.key !== op.asset.key)
             fail('LIBRARY_INSTANCE_READBACK_MISMATCH');
           const actual = plain(n.variantProperties) || {};
           for (const [key, value] of Object.entries(op.asset.variantProperties))
             if (actual[key] !== value) fail('LIBRARY_VARIANT_READBACK_MISMATCH', key);
+          for (const change of changes) {
+            if (!sameFont(change.node.fontName, change.sub.to))
+              fail(
+                'LIBRARY_FONT_READBACK_MISMATCH',
+                `${change.node.id}: ${JSON.stringify(plain(change.node.fontName))}`,
+              );
+            for (const [key, value] of Object.entries(change.typography))
+              if (JSON.stringify(plain(change.node[key])) !== JSON.stringify(value))
+                fail('LIBRARY_TYPOGRAPHY_READBACK_MISMATCH', `${change.node.id}.${key}`);
+          }
+          libraryInstances[op.key] = {
+            fontSubstitutions: (op.fontSubstitutions || []).map((sub) => ({
+              ...sub,
+              count: changes.filter((c) => c.sub === sub).length,
+            })),
+          };
         }
         setProps(n, op.props || {}, false);
         if (op.op === 'library-instance')
           libraryInstances[op.key] = {
+            ...libraryInstances[op.key],
             nodeId: n.id,
             libraryId: op.asset.libraryId,
             familyId: op.asset.familyId,

@@ -44125,11 +44125,13 @@ var base = {
   parentId: nodeIdSchema,
   props: layerPropsSchema.default({})
 };
+var font = external_exports.object({ family: external_exports.string().min(1).max(200), style: external_exports.string().min(1).max(200) }).strict();
 var patchOperationSchema = external_exports.discriminatedUnion("op", [
   external_exports.object({
     op: external_exports.literal("library-instance"),
     ...base,
     familyId: nodeIdSchema,
+    fontSubstitutions: external_exports.array(external_exports.object({ from: font, to: font }).strict()).max(32).default([]),
     variants: external_exports.record(external_exports.string().max(200), external_exports.string().max(300)).default({}),
     componentProperties: external_exports.record(external_exports.string().max(300), external_exports.union([external_exports.string().max(2e4), external_exports.boolean()])).default({})
   }).strict(),
@@ -46720,7 +46722,8 @@ var summary = (family) => ({
   name: family.name,
   page: family.page,
   type: family.type,
-  variantCount: family.variants.length
+  variantCount: family.variants.length,
+  publishStatus: family.publishStatus ?? "unknown"
 });
 function searchLibrary({ query = "", page, familyId, offset = 0, limit = 20 } = {}) {
   if (familyId) {
@@ -46746,7 +46749,12 @@ function searchLibrary({ query = "", page, familyId, offset = 0, limit = 20 } = 
     coverage: {
       pages: catalog.pages.length,
       families: catalog.families.length,
-      variants: catalog.families.reduce((sum, f) => sum + f.variants.length, 0)
+      variants: catalog.families.reduce((sum, f) => sum + f.variants.length, 0),
+      publication: catalog.families.reduce((counts, f) => {
+        const status = f.publishStatus ?? "unknown";
+        counts[status] = (counts[status] || 0) + 1;
+        return counts;
+      }, {})
     },
     pages: catalog.pages.filter((p) => !page || p.name.toLowerCase() === page.toLowerCase()).map((p) => ({
       id: p.id,
@@ -46755,6 +46763,7 @@ function searchLibrary({ query = "", page, familyId, offset = 0, limit = 20 } = 
       componentSets: p.componentSets,
       role: p.components ? "components" : p.nodes > 1 ? "reference" : "separator",
       sampledPublishStatus: p.sampledPublishStatus,
+      publishStatuses: p.publishStatuses,
       ...page ? {
         referenceNodes: p.referenceNodes.slice(offset, offset + limit),
         referenceTotal: p.referenceNodes.length
@@ -47203,6 +47212,17 @@ async function canvasRuntime(input2) {
         if (Object.keys(op.asset.componentProperties || {}).length && Object.keys(op.props || {}).some((key) => ["text", "fontName", "fontSize"].includes(key)))
           fail("LIBRARY_INSTANCE_TEXT_PROPERTY_REQUIRED");
         type = "INSTANCE";
+        const substitutions = op.fontSubstitutions || [];
+        const seen = /* @__PURE__ */ new Set();
+        for (const sub of substitutions) {
+          if ([sub.from, sub.to].some(
+            (f) => !f || typeof f.family !== "string" || !f.family || typeof f.style !== "string" || !f.style
+          ))
+            fail("INVALID_FONT_SUBSTITUTION");
+          const key = JSON.stringify([sub.from.family, sub.from.style]);
+          if (seen.has(key)) fail("DUPLICATE_FONT_SUBSTITUTION");
+          seen.add(key);
+        }
       } else if (op.op === "insert") {
         type = { frame: "FRAME", rectangle: "RECTANGLE", text: "TEXT" }[op.kind];
         if (!type) fail("INVALID_KIND");
@@ -47241,25 +47261,50 @@ async function canvasRuntime(input2) {
     librarySources.set(op.key, source);
   }
   const fontSet = /* @__PURE__ */ new Map();
-  function collectFonts(n) {
+  const availableFonts = /* @__PURE__ */ new Map();
+  const sameFont = (a, b) => a?.family === b?.family && a?.style === b?.style;
+  function collectFonts(n, substitutions = []) {
+    if (n.type === "TEXT" && n.fontName === api.mixed && substitutions.length)
+      fail("LIBRARY_MIXED_FONT_SUBSTITUTION_UNSUPPORTED", n.id);
     if (n.type === "TEXT" && n.fontName && n.fontName !== api.mixed) {
-      const f = { family: n.fontName.family, style: n.fontName.style };
+      const replacement = substitutions.find((s) => sameFont(n.fontName, s.from))?.to || n.fontName;
+      const f = { family: replacement.family, style: replacement.style };
       fontSet.set(JSON.stringify(f), f);
     }
-    if (n.children) n.children.forEach(collectFonts);
+    if (n.children) n.children.forEach((child) => collectFonts(child, substitutions));
   }
   for (const op of operations) {
     if (op.op === "update" && !op.nodeId.startsWith("$")) collectFonts(get(op.nodeId));
     if (op.op === "clone") collectFonts(get(op.sourceId));
     if (op.op === "instance") collectFonts(get(op.componentId));
-    if (op.op === "library-instance") collectFonts(librarySources.get(op.key));
+    if (op.op === "library-instance")
+      collectFonts(librarySources.get(op.key), op.fontSubstitutions);
     if (op.op === "insert" && op.kind === "text") {
       const f = { family: "Noto Sans SC", style: "Regular" };
       fontSet.set(JSON.stringify(f), f);
     }
     if (op.props?.fontName) fontSet.set(JSON.stringify(op.props.fontName), op.props.fontName);
   }
-  await Promise.all([...fontSet.values()].map((f) => api.loadFontAsync(f)));
+  if (operations.some((op) => op.fontSubstitutions?.length) && typeof api.listAvailableFontsAsync === "function") {
+    for (const font2 of await api.listAvailableFontsAsync())
+      availableFonts.set(
+        JSON.stringify([font2.fontName.family, font2.fontName.style]),
+        plain(font2.fontName)
+      );
+  }
+  const resolveFont = (f) => availableFonts.get(JSON.stringify([f.family, f.style])) || f;
+  await Promise.all(
+    [...fontSet.values()].map(async (f) => {
+      try {
+        await api.loadFontAsync(resolveFont(f));
+      } catch (e) {
+        fail(
+          "FONT_UNAVAILABLE",
+          `${f.family}/${f.style}; specify an available fontSubstitutions mapping. ${String(e)}`
+        );
+      }
+    })
+  );
   if (identity() !== scope.documentIdentity) fail("DOCUMENT_CHANGED");
   if ((target || scope.explicitPage ? page.id : api.currentPage.id) !== scope.pageId)
     fail("PAGE_CHANGED");
@@ -47349,27 +47394,66 @@ async function canvasRuntime(input2) {
         if (n.type === "TEXT" && op.op === "insert")
           n.fontName = { family: "Noto Sans SC", style: "Regular" };
         if (op.op === "library-instance") {
+          let substituteFonts = function(node2) {
+            if (node2.type === "TEXT") {
+              const sub = (op.fontSubstitutions || []).find((s) => sameFont(node2.fontName, s.from));
+              if (sub) {
+                const typography = Object.fromEntries(
+                  ["fontSize", "lineHeight", "letterSpacing", "fills"].filter((key) => node2[key] !== void 0).map((key) => [key, plain(node2[key])])
+                );
+                if (node2.textStyleId) node2.textStyleId = "";
+                const font2 = resolveFont(sub.to);
+                if (node2.characters.length && typeof node2.setRangeFontName === "function")
+                  node2.setRangeFontName(0, node2.characters.length, font2);
+                else node2.fontName = font2;
+                changes.push({ node: node2, sub, typography });
+              }
+            }
+            if (node2.children) node2.children.forEach(substituteFonts);
+          };
+          const changes = [];
           const overrides = op.asset.componentProperties || {};
           if (Object.keys(overrides).length) {
             if (typeof n.setProperties !== "function") fail("LIBRARY_PROPERTIES_UNAVAILABLE");
             const native = n.componentProperties || {};
             for (const [key, value] of Object.entries(overrides)) {
               if (!native[key] || native[key].type !== op.asset.propertyDefinitions[key].type)
-                fail("LIBRARY_PROPERTY_CHANGED", key);
+                fail(
+                  "LIBRARY_PROPERTY_CHANGED",
+                  `${op.key}.${key}; available: ${Object.keys(native).join(", ")}`
+                );
             }
             n.setProperties(overrides);
             for (const [key, value] of Object.entries(overrides))
               if (n.componentProperties?.[key]?.value !== value) fail("READBACK_MISMATCH", key);
           }
+          substituteFonts(n);
           if (n.type !== "INSTANCE" || n.mainComponent?.key !== op.asset.key)
             fail("LIBRARY_INSTANCE_READBACK_MISMATCH");
           const actual = plain(n.variantProperties) || {};
           for (const [key, value] of Object.entries(op.asset.variantProperties))
             if (actual[key] !== value) fail("LIBRARY_VARIANT_READBACK_MISMATCH", key);
+          for (const change of changes) {
+            if (!sameFont(change.node.fontName, change.sub.to))
+              fail(
+                "LIBRARY_FONT_READBACK_MISMATCH",
+                `${change.node.id}: ${JSON.stringify(plain(change.node.fontName))}`
+              );
+            for (const [key, value] of Object.entries(change.typography))
+              if (JSON.stringify(plain(change.node[key])) !== JSON.stringify(value))
+                fail("LIBRARY_TYPOGRAPHY_READBACK_MISMATCH", `${change.node.id}.${key}`);
+          }
+          libraryInstances[op.key] = {
+            fontSubstitutions: (op.fontSubstitutions || []).map((sub) => ({
+              ...sub,
+              count: changes.filter((c) => c.sub === sub).length
+            }))
+          };
         }
         setProps(n, op.props || {}, false);
         if (op.op === "library-instance")
           libraryInstances[op.key] = {
+            ...libraryInstances[op.key],
             nodeId: n.id,
             libraryId: op.asset.libraryId,
             familyId: op.asset.familyId,
