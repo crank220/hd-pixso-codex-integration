@@ -58,6 +58,22 @@ try {
     !library.structuredContent.families[0]?.familyId
   )
     throw Error('Packaged complete library catalog is missing');
+  for (const [libraryId, kind, total] of [
+    ['hd-company-styles', 'styles', 36],
+    ['hd-annotations', 'variables', 1],
+    ['hd-annotations', 'components', 9],
+  ]) {
+    const result = await client.callTool({
+      name: 'pixso_library',
+      arguments: { libraryId, kind, limit: 1 },
+    });
+    if (
+      result.isError ||
+      result.structuredContent.total !== total ||
+      result.structuredContent.libraryId !== libraryId
+    )
+      throw Error('Packaged company resource library is incomplete');
+  }
   const search = JSON.parse(
     execFileSync(
       process.env.PYTHON || 'python3',

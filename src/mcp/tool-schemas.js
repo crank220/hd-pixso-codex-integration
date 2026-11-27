@@ -49,9 +49,28 @@ const font = z
 export const patchOperationSchema = z.discriminatedUnion('op', [
   z
     .object({
+      op: z.literal('library-style'),
+      nodeId: nodeIdSchema,
+      libraryId: nodeIdSchema,
+      styleKey: nodeIdSchema,
+      slot: z.enum(['fill', 'stroke', 'text', 'effect', 'grid']),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal('library-variable'),
+      nodeId: nodeIdSchema,
+      libraryId: nodeIdSchema,
+      variableKey: nodeIdSchema,
+      field: z.literal('visible'),
+    })
+    .strict(),
+  z
+    .object({
       op: z.literal('library-instance'),
       ...base,
       familyId: nodeIdSchema,
+      libraryId: nodeIdSchema.default('ant-design-vue-community'),
       fontSubstitutions: z
         .array(z.object({ from: font, to: font }).strict())
         .max(32)

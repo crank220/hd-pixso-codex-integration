@@ -74,6 +74,17 @@ export async function canvasRuntime(input) {
     'lineHeight',
     'letterSpacing',
     'effects',
+    'fillStyleId',
+    'strokeStyleId',
+    'textStyleId',
+    'effectStyleId',
+    'gridStyleId',
+    'layoutGrids',
+    'paragraphSpacing',
+    'paragraphIndent',
+    'textDecoration',
+    'textCase',
+    'boundVariables',
   ];
   // revision 覆盖完整子树与混合文字样式；超过 12000 节点或 6 MB 时要求缩小范围。
   function snapshot(root) {
@@ -340,6 +351,14 @@ export async function canvasRuntime(input) {
   const aliases = new Map();
   const sourceStates = new Map();
   const librarySources = new Map();
+  const libraryResources = new Map();
+  const styleSlots = {
+    fill: ['PAINT', 'fillStyleId', 'paints', 'fills'],
+    stroke: ['PAINT', 'strokeStyleId', 'paints', 'strokes'],
+    text: ['TEXT', 'textStyleId'],
+    effect: ['EFFECT', 'effectStyleId', 'effects', 'effects'],
+    grid: ['GRID', 'gridStyleId', 'layoutGrids', 'layoutGrids'],
+  };
   function resolve(id) {
     if (typeof id !== 'string') fail('INVALID_NODE_ID');
     if (id.startsWith('$')) {
@@ -413,7 +432,18 @@ export async function canvasRuntime(input) {
   }
   // 全批先预检，包含尚未创建的 $key；已知越界和非法参数不能造成部分写入。
   for (const op of operations) {
-    if (op.op === 'update') {
+    if (op.op === 'library-style' || op.op === 'library-variable') {
+      const n = resolve(op.nodeId);
+      writable(n);
+      if (n.type === 'PAGE') fail('PAGE_UPDATE_UNSUPPORTED');
+      if (!op.asset?.key || !op.asset.sourceFileKey) fail('LIBRARY_ASSET_REQUIRED');
+      if (op.op === 'library-style') {
+        if (!styleSlots[op.slot] || op.asset.type !== styleSlots[op.slot][0])
+          fail('LIBRARY_STYLE_TYPE_MISMATCH');
+        if (op.slot === 'text' && n.type !== 'TEXT') fail('TEXT_REQUIRED');
+      } else if (op.field !== 'visible' || op.asset.resolvedType !== 'BOOLEAN')
+        fail('LIBRARY_VARIABLE_TYPE_MISMATCH');
+    } else if (op.op === 'update') {
       const n = resolve(op.nodeId);
       writable(n);
       if (n.type === 'PAGE') fail('PAGE_UPDATE_UNSUPPORTED', 'Edit a frame instead');
@@ -482,6 +512,49 @@ export async function canvasRuntime(input) {
       aliases.set(op.key, { type, pending: true });
     }
   }
+  // 全批完成范围检查后才导入共享资源；只应用引用，不写源样式或变量值。
+  for (const op of operations.filter((op) =>
+    ['library-style', 'library-variable'].includes(op.op),
+  )) {
+    const asset = op.asset;
+    let resource;
+    if (op.op === 'library-style') {
+      resource =
+        api.fileKey === asset.sourceFileKey && typeof api.getStyleById === 'function'
+          ? api.getStyleById(asset.sourceNodeId)
+          : null;
+      if (!resource) {
+        if (typeof api.importStyleByKeyAsync !== 'function')
+          fail('LIBRARY_STYLE_IMPORT_UNAVAILABLE');
+        resource = await api.importStyleByKeyAsync(asset.key);
+      }
+      if (
+        !resource ||
+        resource.key !== asset.key ||
+        resource.type !== asset.type ||
+        resource.name !== asset.name
+      )
+        fail('LIBRARY_STYLE_CHANGED');
+    } else {
+      resource =
+        api.fileKey === asset.sourceFileKey && typeof api.variables?.getVariableById === 'function'
+          ? api.variables.getVariableById(asset.sourceNodeId)
+          : null;
+      if (!resource) {
+        if (typeof api.variables?.importVariableByKeyAsync !== 'function')
+          fail('LIBRARY_VARIABLE_IMPORT_UNAVAILABLE');
+        resource = await api.variables.importVariableByKeyAsync(asset.key);
+      }
+      if (
+        !resource ||
+        resource.key !== asset.key ||
+        resource.resolvedType !== asset.resolvedType ||
+        resource.name !== asset.name
+      )
+        fail('LIBRARY_VARIABLE_CHANGED');
+    }
+    libraryResources.set(op, resource);
+  }
   // 全批预检后才允许导入库依赖。只读源组件，禁止为了可用性自动发布或重建源库。
   for (const op of operations.filter((op) => op.op === 'library-instance')) {
     const asset = op.asset;
@@ -522,6 +595,13 @@ export async function canvasRuntime(input) {
     if (n.children) n.children.forEach((child) => collectFonts(child, substitutions));
   }
   for (const op of operations) {
+    if (op.op === 'library-style' && op.slot === 'text') {
+      const style = libraryResources.get(op);
+      const f = style.fontName;
+      if (!f || f === api.mixed) fail('LIBRARY_STYLE_FONT_UNSUPPORTED');
+      fontSet.set(JSON.stringify(f), plain(f));
+      if (!op.nodeId.startsWith('$')) collectFonts(get(op.nodeId));
+    }
     if (op.op === 'update' && !op.nodeId.startsWith('$')) collectFonts(get(op.nodeId));
     if (op.op === 'clone') collectFonts(get(op.sourceId));
     if (op.op === 'instance') collectFonts(get(op.componentId));
@@ -581,13 +661,33 @@ export async function canvasRuntime(input) {
   ];
   function setProps(n, props, recording) {
     const saved = {};
-    for (const field of fields)
-      if (n[field] !== undefined && typeof n[field] !== 'symbol') saved[field] = plain(n[field]);
+    // 新建节点由整节点移除补偿，仅修改已有节点时才读取恢复字段。
+    if (recording)
+      for (const field of fields) {
+        try {
+          if (n[field] !== undefined && typeof n[field] !== 'symbol')
+            saved[field] = plain(n[field]);
+        } catch (error) {
+          fail('SNAPSHOT_PROPERTY_UNAVAILABLE', `${n.id}.${field}: ${String(error)}`);
+        }
+      }
     if (recording)
       undo.push(() => {
         // 先还原文字布局模式再还原尺寸/坐标，最后用完整快照核对，不能只确认 undo 被调用。
         for (const [key, value] of Object.entries(saved))
-          if (!['width', 'height', 'x', 'y'].includes(key)) n[key] = value;
+          if (
+            !['width', 'height', 'x', 'y', 'boundVariables'].includes(key) &&
+            !key.endsWith('StyleId')
+          )
+            n[key] = value;
+        for (const key of [
+          'fillStyleId',
+          'strokeStyleId',
+          'textStyleId',
+          'effectStyleId',
+          'gridStyleId',
+        ])
+          if (saved[key] !== undefined) n[key] = saved[key];
         n.resize(saved.width, saved.height);
         n.x = saved.x;
         n.y = saved.y;
@@ -641,7 +741,72 @@ export async function canvasRuntime(input) {
   }
   try {
     for (const op of operations) {
-      if (op.op === 'update') {
+      if (op.op === 'library-style') {
+        const n = resolve(op.nodeId),
+          style = libraryResources.get(op),
+          slot = styleSlots[op.slot];
+        if (!(slot[1] in n)) fail('LIBRARY_STYLE_SLOT_UNAVAILABLE');
+        // 空属性快照为样式带来的文字/几何变化提供补偿；共享样式本身保持只读。
+        setProps(n, {}, true);
+        n[slot[1]] = style.id;
+        try {
+          if (n[slot[1]] !== style.id) fail('LIBRARY_STYLE_READBACK_MISMATCH');
+        } catch (error) {
+          fail(
+            'LIBRARY_STYLE_REFERENCE_UNAVAILABLE',
+            `${op.asset.name}/${n.id}/${slot[1]}: ${String(error)}`,
+          );
+        }
+        const keys =
+          op.slot === 'text'
+            ? [
+                'fontName',
+                'fontSize',
+                'lineHeight',
+                'letterSpacing',
+                'paragraphSpacing',
+                'paragraphIndent',
+                'textDecoration',
+                'textCase',
+              ]
+            : [slot[3]];
+        for (const key of keys) {
+          const expected = op.slot === 'text' ? style[key] : style[slot[2]];
+          if (
+            expected !== undefined &&
+            JSON.stringify(plain(n[key])) !== JSON.stringify(plain(expected))
+          )
+            fail('LIBRARY_STYLE_VALUE_MISMATCH', key);
+        }
+        updated.push(n.id);
+      } else if (op.op === 'library-variable') {
+        const n = resolve(op.nodeId),
+          variable = libraryResources.get(op);
+        if (typeof n.setBoundVariable !== 'function') fail('LIBRARY_VARIABLE_BINDING_UNAVAILABLE');
+        const boundId = () => {
+          const binding = n.boundVariables?.[op.field];
+          if (Array.isArray(binding)) {
+            if (binding.length > 1) fail('LIBRARY_VARIABLE_BINDING_AMBIGUOUS');
+            return binding[0]?.id;
+          }
+          return binding?.id;
+        };
+        const priorId = boundId();
+        const prior = priorId ? api.variables?.getVariableById(priorId) : null;
+        if (priorId && !prior) fail('LIBRARY_VARIABLE_ROLLBACK_UNAVAILABLE');
+        const visible = n.visible;
+        undo.push(() => {
+          n.setBoundVariable(op.field, prior);
+          n.visible = visible;
+        });
+        n.setBoundVariable(op.field, variable);
+        if (boundId() !== variable.id)
+          fail(
+            'LIBRARY_VARIABLE_READBACK_MISMATCH',
+            `${n.id}: expected ${variable.id}, actual ${JSON.stringify(plain(n.boundVariables))}`,
+          );
+        updated.push(n.id);
+      } else if (op.op === 'update') {
         const n = resolve(op.nodeId);
         setProps(n, op.props || {}, true);
         updated.push(n.id);

@@ -2,11 +2,33 @@
 import { readFileSync } from 'node:fs';
 import { PLUGIN_ROOT } from '../plugin-info.js';
 
-const catalog = JSON.parse(
-  readFileSync(new URL('assets/libraries/ant-design-vue.json', PLUGIN_ROOT), 'utf8'),
+const registry = JSON.parse(
+  readFileSync(new URL('assets/libraries/registry.json', PLUGIN_ROOT), 'utf8'),
 );
-export const LIBRARY_ID = catalog.id;
-const families = new Map(catalog.families.map((family) => [family.id, family]));
+const catalogs = new Map(
+  registry.map((entry) => {
+    const data = JSON.parse(
+      readFileSync(new URL(`assets/libraries/${entry.file}`, PLUGIN_ROOT), 'utf8'),
+    );
+    return [entry.id, { ...data, purpose: entry.purpose }];
+  }),
+);
+export const LIBRARY_ID = 'ant-design-vue-community';
+const getCatalog = (id = LIBRARY_ID) => {
+  const catalog = catalogs.get(id);
+  if (!catalog) throw Error('LIBRARY_NOT_FOUND');
+  return catalog;
+};
+const libraries = () =>
+  [...catalogs.values()].map((c) => ({
+    id: c.id,
+    name: c.name,
+    purpose: c.purpose,
+    pages: c.pages.length,
+    families: c.families.length,
+    styles: (c.styles || []).length,
+    variables: (c.variables || []).length,
+  }));
 const summary = (family) => ({
   familyId: family.id,
   name: family.name,
@@ -17,12 +39,40 @@ const summary = (family) => ({
 });
 
 /** 分页返回目录，显式 familyId 才返回属性定义与变体，避免一次输出整个组件库。 */
-export function searchLibrary({ query = '', page, familyId, offset = 0, limit = 20 } = {}) {
+export function searchLibrary({
+  libraryId = LIBRARY_ID,
+  kind = 'components',
+  query = '',
+  page,
+  familyId,
+  offset = 0,
+  limit = 20,
+} = {}) {
+  const catalog = getCatalog(libraryId);
+  if (!['components', 'styles', 'variables'].includes(kind))
+    throw Error('LIBRARY_RESOURCE_KIND_UNSUPPORTED');
+  if (kind !== 'components') {
+    if (familyId || page) throw Error('LIBRARY_RESOURCE_FILTER_UNSUPPORTED');
+    const matches = (catalog[kind] || []).filter((row) =>
+      `${row.name} ${row.key}`.toLowerCase().includes(query.toLowerCase()),
+    );
+    return {
+      libraryId,
+      source: catalog.source,
+      libraries: libraries(),
+      kind,
+      total: matches.length,
+      offset,
+      nextOffset: offset + limit < matches.length ? offset + limit : null,
+      resources: matches.slice(offset, offset + limit),
+    };
+  }
   if (familyId) {
-    const family = families.get(familyId);
+    const family = catalog.families.find((row) => row.id === familyId);
     if (!family) throw Error('LIBRARY_FAMILY_NOT_FOUND');
     return {
-      libraryId: LIBRARY_ID,
+      libraryId,
+      libraries: libraries(),
       source: catalog.source,
       ...summary(family),
       definitions: family.definitions,
@@ -38,9 +88,12 @@ export function searchLibrary({ query = '', page, familyId, offset = 0, limit = 
       `${f.page} ${f.name}`.toLowerCase().includes(query.toLowerCase()),
   );
   return {
-    libraryId: LIBRARY_ID,
+    libraryId,
+    libraries: libraries(),
     source: catalog.source,
     coverage: {
+      styles: (catalog.styles || []).length,
+      variables: (catalog.variables || []).length,
       pages: catalog.pages.length,
       families: catalog.families.length,
       variants: catalog.families.reduce((sum, f) => sum + f.variants.length, 0),
@@ -72,13 +125,19 @@ export function searchLibrary({ query = '', page, familyId, offset = 0, limit = 
     families: matches.slice(offset, offset + limit).map(summary),
     nextOffset: offset + limit < matches.length ? offset + limit : null,
     notice:
-      'Metadata coverage is not import verification. Published library access is required across files. The UI kit declares 4.2.3; code API compatibility still needs verification.',
+      'Catalog values are captured metadata. Native library access and imported versions must be verified; annotation instances do not create native comments.',
   };
 }
 
 /** 只允许目录中存在的组合；优先完整默认组合，不把含糊匹配静默选成第一个。 */
-export function selectLibraryVariant(familyId, variants = {}, componentProperties = {}) {
-  const family = families.get(familyId);
+export function selectLibraryVariant(
+  familyId,
+  variants = {},
+  componentProperties = {},
+  libraryId = LIBRARY_ID,
+) {
+  const catalog = getCatalog(libraryId);
+  const family = catalog.families.find((row) => row.id === familyId);
   if (!family) throw Error('LIBRARY_FAMILY_NOT_FOUND');
   const defs = family.definitions;
   for (const [name, value] of Object.entries(variants)) {
@@ -113,7 +172,7 @@ export function selectLibraryVariant(familyId, variants = {}, componentPropertie
       throw Error(`LIBRARY_PROPERTY_UNSUPPORTED: ${name}`);
   }
   return {
-    libraryId: LIBRARY_ID,
+    libraryId,
     sourceFileKey: catalog.source.fileKey,
     familyId,
     sourceNodeId: chosen.nodeId,
@@ -130,6 +189,7 @@ export function selectLibraryVariant(familyId, variants = {}, componentPropertie
 
 /** 只返回目录入口，不把没有映射的推荐误报为已实例化或已核验 API。 */
 export function libraryRecommendation(semantic) {
+  const catalog = getCatalog();
   const pages = { datePicker: 'DatePicker', datepicker: 'DatePicker' };
   const page = catalog.pages.find(
     (p) => p.name.toLowerCase() === (pages[semantic] || semantic).toLowerCase(),
@@ -143,4 +203,13 @@ export function libraryRecommendation(semantic) {
         tool: 'pixso_library',
       }
     : null;
+}
+
+/** 资源按库和真实 key 精确定位；调用方不能注入任意共享样式或变量。 */
+export function selectLibraryResource(libraryId, kind, key) {
+  const catalog = getCatalog(libraryId);
+  if (!['styles', 'variables'].includes(kind)) throw Error('LIBRARY_RESOURCE_KIND_UNSUPPORTED');
+  const asset = (catalog[kind] || []).find((row) => row.key === key);
+  if (!asset) throw Error('LIBRARY_RESOURCE_NOT_FOUND');
+  return { ...asset, libraryId, sourceFileKey: catalog.source.fileKey, sourceNodeId: asset.id };
 }

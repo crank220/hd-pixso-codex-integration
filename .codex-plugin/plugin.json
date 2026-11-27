@@ -1,7 +1,7 @@
 {
   "name": "hd-pixso-codex",
-  "version": "0.3.1",
-  "description": "本地/远程 Pixso 设计，内置 Ant Design Vue 全页资产目录、真实变体选择与受限原生实例化。",
+  "version": "0.4.0",
+  "description": "本地/远程 Pixso 设计，接入 Ant Design Vue、公司品牌样式和 UI/UX 标注组件及变量，按授权范围原生复用。",
   "author": {
     "name": "crank220"
   },

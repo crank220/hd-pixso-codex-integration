@@ -1,0 +1,5 @@
+[
+  { "id": "ant-design-vue-community", "file": "ant-design-vue.json", "purpose": "ui-components" },
+  { "id": "hd-company-styles", "file": "company-styles.json", "purpose": "brand-styles" },
+  { "id": "hd-annotations", "file": "annotations.json", "purpose": "design-annotations" }
+]

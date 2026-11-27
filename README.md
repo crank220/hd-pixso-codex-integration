@@ -66,7 +66,7 @@ $hd-design
 
 ## 插件能力
 
-在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.3.1 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
+在 Codex 输入需求，在 Pixso 查看、编辑可编辑设计稿。**0.4.0 支持本地/远程两种连接模式，内置 UI/UX Pro Max 检索和逐层精修流程。**
 
 - 先读取最新状态，再绑定用户指定页面/子树；保留手动调整，旧快照拒写。
 - 项目已有组件 → Ant Design Vue → 必要时新增组件。Vue/Ant Design Vue 默认设计目标为 `^4.1.0`，实际项目以锁文件核对。
@@ -93,6 +93,27 @@ $hd-design
 
 源库含 `SF Pro` 字体。当前账号缺少源字体时，0.3.1 支持显式 `fontSubstitutions`，仅覆盖新建实例，并校验字号、行高、字距和颜色未改变；不静默替换字体。示例见[字体映射](skills/hd-design/references/library.md#字体映射)。
 
+## 公司资源库接入
+
+新增两份已发布资源库，与 Ant Design Vue 统一通过 `pixso_library` 查询和 `pixso_patch` 执行：
+
+| 资源库 | libraryId | 完整目录覆盖 | 执行方式 |
+| --- | --- | --- | --- |
+| 设计文件 | `hd-company-styles` | 全部1页，36个已发布样式：15颜色、14文字、7效果 | `library-style` 将真实样式引用应用到授权图层 |
+| UI/UX设计标注系统 | `hd-annotations` | 全部4页，9组件族/36变体、1布尔变量 | `library-instance` 创建原生标注组件；`library-variable` 绑定可见性 |
+
+标注库的7个发布组件族中，6个为 `CURRENT`，1个为 `CHANGED`（源文件有未发布改动）；另外2个为未发布示例，仍登记但不冒充已发布。跨文件读取的是可访问的已发布版本，属性、名称或变体不符会拒绝执行，不自动发布源库。
+
+```text
+$hd-design
+只修改我指定的页面，先读取最新状态并绑定范围。
+公司品牌样式使用「设计文件」hd-company-styles，查询 kind=styles 后应用真实样式。
+标注使用「UI/UX设计标注系统」hd-annotations，先读取其最新规范；仅补充必要的精炼说明。
+控件优先复用项目已有组件，其次使用 Ant Design Vue。
+```
+
+本地真实验证已应用全部36个样式、实例化蓝/红标记点并绑定布尔可见性变量，均读回原生引用并检查截图。样式名称不替代实际属性值；例如源样式 `WEB/文字/Regular/10px` 实际为12px，插件保留源值。目录不打包示例业务画板或规范正文；设计时仍读取可访问的最新规范。视觉标注组件不会创建 Pixso 原生注释，不能因此宣称原生注释已完成。详见[多库使用](skills/hd-design/references/library.md#公司资源库)。
+
 ## 安装与升级
 
 要求 Node.js 20+（macOS / Windows / Linux）；UI/UX Pro Max 检索使用 Python 3，数据和脚本随插件分发，不需单独安装同名技能。无 Python 时仍可读取参考规则，但不宣称已执行搜索。
@@ -102,7 +123,7 @@ codex plugin marketplace add crank220/hd-pixso-codex-integration
 codex plugin add hd-pixso-codex@hd-design-plugins
 ```
 
-已安装用户在 Codex 插件管理中刷新来源、更新至 **0.3.1**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
+已安装用户在 Codex 插件管理中刷新来源、更新至 **0.4.0**，然后开始新会话；客户端菜单/更新命令以其版本为准。仓库自带独立 `dist/`，安装后无需在缓存目录执行 npm install。也可从 GitHub Release 下载 ZIP。确保 Node 可从 Codex 的 PATH 找到。
 
 ## 选择连接模式
 
@@ -164,8 +185,8 @@ Windows 也可使用 `node "C:\path\hd-pixso-codex\dist\login.js"`。终端输�
 | `pixso_status` | 读取连接能力、本地活动文件或远程链接目标 |
 | `pixso_begin` | 本地按唯一 pageName 绑定页面/子树，缺省活动页；远程必须targetUrl |
 | `pixso_read` | 最新状态与revision |
-| `pixso_patch` | 受限声明式编辑，最多50项，含 `library-instance` 原生资产实例化 |
-| `pixso_library` | 离线检索全部资产页面、组件族、真实变体与属性 |
+| `pixso_patch` | 受限声明式编辑，最多50项，含原生组件实例、共享样式应用和可见性变量绑定 |
+| `pixso_library` | 按库检索页面、组件、样式、变量与实际属性 |
 | `pixso_components` | 查真实组件/变体 |
 | `pixso_read_reference` | 只读提取规范文字与组件；远程传规范targetUrl |
 | `pixso_audit` | 字体/溢出、明确图层组尺寸坐标检查与规范读取证据 |
@@ -193,6 +214,6 @@ npm run package
 node scripts/test-package.js
 ```
 
-当前 MCP 没有任意脚本、页面创建/删除、跨页移动或全局样式写入口。多页整理需通过 Pixso 原生界面完成页面创建与移动，再重新绑定目标页；不能把用户的多页授权误解为单页限制，也不能以其他 MCP 绕过范围锁。快照限制12,000节点/6MB，范围30分钟未读取后失效。失败或超时先读回，不直接重放；回滚只有verified=true才算验证恢复。纯设计任务不会自动另做一个网站。
+当前 MCP 没有任意脚本、页面创建/删除、跨页移动或全局样式定义写入口。多页整理需通过 Pixso 原生界面完成页面创建与移动，再重新绑定目标页；不能把用户的多页授权误解为单页限制，也不能以其他 MCP 绕过范围锁。快照限制12,000节点/6MB，范围30分钟未读取后失效。失败或超时先读回，不直接重放；回滚只有verified=true才算验证恢复。纯设计任务不会自动另做一个网站。
 
-UI/UX Pro Max按MIT随包分发，来源与许可见 [PROVENANCE](skills/hd-design/vendor/ui-ux-pro-max/PROVENANCE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。公司文件、内部规范、账号与凭据不随包发布。
+UI/UX Pro Max按MIT随包分发，来源与许可见 [PROVENANCE](skills/hd-design/vendor/ui-ux-pro-max/PROVENANCE.md) 和 [第三方声明](THIRD_PARTY_NOTICES.md)。公司资源仅分发接入所需元数据；完整公司文件、规范正文、账号与凭据不随包发布。

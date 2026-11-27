@@ -60,3 +60,38 @@
 2026-11-27 本地真实跨文件已验证13个原生实例并检查截图，未逐一创建全部变体，也未完成真实远程账号验证。
 
 设计状态（hover、focused、pressed）与代码 props 分开：悬停并非一个名为 hover 的 Vue 属性。状态稿不等于运行原型。库版本、主题同步与 API 能力核验仍遵循具体项目证据，接入目录不代表其全部完成。
+## 公司资源库
+
+`pixso_library` 每次返回可用库清单；`libraryId` 缺省仍是 `ant-design-vue-community`，旧调用兼容。公司品牌样式优先使用 `hd-company-styles`，标注资源使用 `hd-annotations`；资源以库标识和真实 key 定位，同名或同节点 ID 不构成跨库映射。
+
+- 公司样式：`pixso_library({libraryId:"hd-company-styles",kind:"styles",query:"WEB/文字",limit:20})`。完整1页/36样式，返回真实key、发布状态和实际属性。命名与属性不一致时以实际读回为准并说明，不按名称重绘。
+- 标注组件：`pixso_library({libraryId:"hd-annotations",page:"控件"})`；再传 `familyId` 查变体。完整4页/9族/36变体，其中7族有发布版本（6 CURRENT、1 CHANGED），2族是未发布示例。原生实例必须显式传 `libraryId:"hd-annotations"`。
+- 标注变量：`pixso_library({libraryId:"hd-annotations",kind:"variables"})`，当前1个 BOOLEAN。只支持绑定节点 `visible`；不改变量值、变量集或模式。
+
+在已绑定的授权范围内执行：
+
+```json
+{
+  "op": "library-style",
+  "libraryId": "hd-company-styles",
+  "nodeId": "授权图层ID或本批$key",
+  "styleKey": "pixso_library返回的真实样式key",
+  "slot": "fill"
+}
+```
+
+样式 slot 为 `fill`、`stroke`（PAINT），`text`（TEXT节点），`effect`（EFFECT）或 `grid`（GRID）；仅目录实际存在的类型可用。原生导入后读回key/类型/名称，再应用样式引用并核对值，不复制HEX冒充绑定。
+
+```json
+{
+  "op": "library-variable",
+  "libraryId": "hd-annotations",
+  "nodeId": "授权图层ID或本批$key",
+  "variableKey": "pixso_library返回的真实变量key",
+  "field": "visible"
+}
+```
+
+变量绑定校验原生别名（兼容对象和数组返回）；失败补偿恢复原绑定和可见性。所有操作仍受最新revision、主组件只读和页面/子树范围保护。跨文件导入可能留下编辑器依赖缓存，不能把可见图层撤回说成清除所有缓存。
+
+公司规范正文不随插件发布。设计时用 `pixso_read_reference` 读取最新「UI/UX设计标注系统」，然后回到目标范围；不把资产目录、静态标记点或变量绑定当作规范验收或原生注释写入证据。保留用户已删除的注释，不为展示资源而自动重建说明。

@@ -1,6 +1,11 @@
 // 管理设计范围、完整快照版本和规范读取凭据，协调受限编辑与验证。
 import { createHash, randomUUID } from 'node:crypto';
-import { searchLibrary, selectLibraryVariant, libraryRecommendation } from '../library/catalog.js';
+import {
+  searchLibrary,
+  selectLibraryVariant,
+  selectLibraryResource,
+  libraryRecommendation,
+} from '../library/catalog.js';
 import { canvasRuntime } from './canvas-runtime.js';
 import { inspectProject, chooseComponent, loadProjectConfig } from '../project/inspect-project.js';
 import { parseToolResult } from '../pixso/upstream.js';
@@ -129,13 +134,25 @@ export class DesignService {
       // 资产 key 仅从内置目录解析，不能由工具调用方注入任意外部组件。
       let checkedOperations = operations.map((op) =>
         op.op === 'library-instance'
-          ? { ...op, asset: selectLibraryVariant(op.familyId, op.variants, op.componentProperties) }
-          : op,
+          ? {
+              ...op,
+              asset: selectLibraryVariant(
+                op.familyId,
+                op.variants,
+                op.componentProperties,
+                op.libraryId,
+              ),
+            }
+          : op.op === 'library-style'
+            ? { ...op, asset: selectLibraryResource(op.libraryId, 'styles', op.styleKey) }
+            : op.op === 'library-variable'
+              ? { ...op, asset: selectLibraryResource(op.libraryId, 'variables', op.variableKey) }
+              : op,
       );
       if (operations.some((op) => op.op === 'library-instance') && projectRoot) {
         const project = await inspectProject(projectRoot);
         for (const op of operations.filter((op) => op.op === 'library-instance')) {
-          const family = searchLibrary({ familyId: op.familyId });
+          const family = searchLibrary({ libraryId: op.libraryId, familyId: op.familyId });
           const semantic = family.page[0].toLowerCase() + family.page.slice(1);
           if (chooseComponent(semantic, project.config, project).provider === 'project')
             throw Error('PROJECT_COMPONENT_PRIORITY: resolve the existing project wrapper first');

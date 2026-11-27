@@ -39,9 +39,23 @@ for (const file of [
   'skills/hd-design/SKILL.md',
   'assets/icon.svg',
   'assets/libraries/ant-design-vue.json',
+  'assets/libraries/registry.json',
+  'assets/libraries/company-styles.json',
+  'assets/libraries/annotations.json',
   'skills/hd-design/references/library.md',
 ])
   await access(file);
+for (const entry of await readJson('assets/libraries/registry.json')) {
+  const catalog = await readJson(`assets/libraries/${entry.file}`);
+  if (catalog.id !== entry.id || !catalog.pages.length) throw Error('Incomplete library catalog');
+  if (
+    entry.id !== 'ant-design-vue-community' &&
+    catalog.pages.some((page) =>
+      page.referenceNodes.some((node) => !['COMPONENT', 'COMPONENT_SET'].includes(node.type)),
+    )
+  )
+    throw Error('Business frame references are not release assets');
+}
 if ((await stat('dist/server.js')).size < 1000) throw Error('Empty runtime bundle');
 for (const file of [
   'skills/hd-design/vendor/ui-ux-pro-max/LICENSE',

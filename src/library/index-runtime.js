@@ -69,13 +69,75 @@ export async function indexLibraryRuntime(expectedFileKey) {
       publishStatuses,
       sampledPublishStatus: sample?.status ?? 'not-applicable',
       sampledComponentId: sample?.id ?? null,
-      referenceNodes: page.children.map((n) => ({ id: n.id, name: n.name, type: n.type })),
+      referenceNodes: page.children
+        .filter((n) => n.type !== 'TEXT')
+        .map((n) => ({ id: n.id, name: n.name, type: n.type })),
     });
   }
+  const styles = [];
+  for (const method of [
+    'getLocalPaintStyles',
+    'getLocalTextStyles',
+    'getLocalEffectStyles',
+    'getLocalGridStyles',
+  ]) {
+    if (typeof pixso[method] !== 'function') continue;
+    for (const style of pixso[method]()) {
+      const row = {
+        id: style.id,
+        key: style.key,
+        name: style.name,
+        type: style.type,
+        publishStatus:
+          typeof style.getPublishStatusAsync === 'function'
+            ? await style.getPublishStatusAsync()
+            : 'unknown',
+      };
+      for (const key of [
+        'paints',
+        'fontName',
+        'fontSize',
+        'lineHeight',
+        'letterSpacing',
+        'paragraphSpacing',
+        'paragraphIndent',
+        'textDecoration',
+        'textCase',
+        'effects',
+        'layoutGrids',
+      ])
+        if (style[key] !== undefined) row[key] = style[key];
+      styles.push(row);
+    }
+  }
+  const variables =
+    typeof pixso.variables?.getLocalVariablesAsync === 'function'
+      ? (await pixso.variables.getLocalVariablesAsync()).map((v) => ({
+          id: v.id,
+          key: v.key,
+          name: v.name,
+          resolvedType: v.resolvedType,
+          valuesByMode: v.valuesByMode,
+          variableCollectionId: v.variableCollectionId,
+          scopes: v.scopes,
+          hiddenFromPublishing: v.hiddenFromPublishing,
+        }))
+      : [];
+  const collections =
+    typeof pixso.variables?.getLocalVariableCollectionsAsync === 'function'
+      ? (await pixso.variables.getLocalVariableCollectionsAsync()).map((c) => ({
+          id: c.id,
+          key: c.key,
+          name: c.name,
+          modes: c.modes,
+          defaultModeId: c.defaultModeId,
+          hiddenFromPublishing: c.hiddenFromPublishing,
+        }))
+      : [];
   if (
     pixso.fileKey !== expectedFileKey ||
     pixso.root.children.map((p) => p.id).join(',') !== pageIds
   )
     throw Error('LIBRARY_CHANGED_DURING_INDEX');
-  return { name: pixso.root.name, pages, families };
+  return { name: pixso.root.name, pages, families, styles, variables, collections };
 }
