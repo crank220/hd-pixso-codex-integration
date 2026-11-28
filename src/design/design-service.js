@@ -269,6 +269,7 @@ export class DesignService {
         },
         tokens: config?.tokens ?? null,
         componentPriority: ['project', 'ant-design-vue', 'custom'],
+        componentPriorityScope: 'vue-code-mapping-only; design follows hd-design project rules',
       };
     });
   }

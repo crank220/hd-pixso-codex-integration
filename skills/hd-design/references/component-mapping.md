@@ -2,6 +2,8 @@
 
 配置放在用户明确连接的项目根目录 `.pixso-codex.json`，工具只读此配置，不修改业务代码。
 
+本参考的「项目组件 → Ant Design Vue → 必要时新增」仅为Vue代码映射候选顺序；audit返回的componentPriority也限定于此。纯设计的组件与风格按[项目及端规则](xiaohuiyun.md)选择，不据此替换APP、设备或其他项目既有设计系统。
+
 ```json
 {
   "schemaVersion": 1,

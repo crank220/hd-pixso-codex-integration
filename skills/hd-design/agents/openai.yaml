@@ -1,4 +1,4 @@
 interface:
   display_name: "HD Codex + Pixso 双向工作流"
-  short_description: "读取与编辑 Pixso，复用公司资源、精修交互和标注，按证据维护插件"
-  default_prompt: "使用 $hd-design 读取我指定的 Pixso 页面或图层链接，结合 UI/UX Pro Max 精修，保持页面纯净，并检查图标状态、范围和标注。"
+  short_description: "识别项目并复用团队资源，只改指定页面，新增落笔，按公司系统标注并验收"
+  default_prompt: "使用 $hd-design 先查看设计文件已有页面并确定本次增量，识别小灰云星空项目及端，按团队规范复用资源。仅修改我指定的页面，新增页名称加「hd-design」，所有项目使用UI/UX设计标注系统，全部完成并保存验收后交付。"

@@ -93,7 +93,7 @@ register(
 );
 register(
   'pixso_library',
-  '只读检索资源，使用顺序为设计文件 → UI/UX设计标注系统 → Ant Design Vue (Community)。libraryId 必填并指定库，kind 选择 components/styles/variables；按 page/query 查目录，familyId 查真实变体。返回真实key与发布状态，目录命中不代表已导入。',
+  '只读检索已索引资源。先按hd-design识别项目与端：小灰云星空优先适用团队库，其他项目沿用原风格；所有项目用UI/UX设计标注系统标注。libraryId必填，kind选components/styles/variables；page/query查目录，familyId查变体。返回真实key与发布状态，目录命中不代表已导入；设备端未完整索引，不编造库ID。',
   {
     libraryId: id,
     kind: z.enum(['components', 'styles', 'variables']).default('components'),
@@ -161,7 +161,7 @@ register(
 );
 register(
   'resolve_vue_component',
-  '按 项目组件 → Ant Design Vue → 必要时新增 的顺序选择组件。缺少 Pixso 映射会明确返回 needs-mapping，不能假装已复用。',
+  '仅用于Vue代码映射：按项目组件 → Ant Design Vue → 必要时新增选择候选。缺少Pixso映射返回needs-mapping，不能假装已复用。纯设计组件与风格按hd-design项目/端规则选择，不据此替换既有设计系统。',
   { semantic: z.string().min(1), projectRoot: z.string().optional() },
   (args) => service.resolveComponent(args),
 );

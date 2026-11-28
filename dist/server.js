@@ -48161,7 +48161,8 @@ var DesignService = class {
           screenshotRequired: true
         },
         tokens: config2?.tokens ?? null,
-        componentPriority: ["project", "ant-design-vue", "custom"]
+        componentPriority: ["project", "ant-design-vue", "custom"],
+        componentPriorityScope: "vue-code-mapping-only; design follows hd-design project rules"
       };
     });
   }
@@ -48270,7 +48271,7 @@ register(
 );
 register(
   "pixso_library",
-  "\u53EA\u8BFB\u68C0\u7D22\u8D44\u6E90\uFF0C\u4F7F\u7528\u987A\u5E8F\u4E3A\u8BBE\u8BA1\u6587\u4EF6 \u2192 UI/UX\u8BBE\u8BA1\u6807\u6CE8\u7CFB\u7EDF \u2192 Ant Design Vue (Community)\u3002libraryId \u5FC5\u586B\u5E76\u6307\u5B9A\u5E93\uFF0Ckind \u9009\u62E9 components/styles/variables\uFF1B\u6309 page/query \u67E5\u76EE\u5F55\uFF0CfamilyId \u67E5\u771F\u5B9E\u53D8\u4F53\u3002\u8FD4\u56DE\u771F\u5B9Ekey\u4E0E\u53D1\u5E03\u72B6\u6001\uFF0C\u76EE\u5F55\u547D\u4E2D\u4E0D\u4EE3\u8868\u5DF2\u5BFC\u5165\u3002",
+  "\u53EA\u8BFB\u68C0\u7D22\u5DF2\u7D22\u5F15\u8D44\u6E90\u3002\u5148\u6309hd-design\u8BC6\u522B\u9879\u76EE\u4E0E\u7AEF\uFF1A\u5C0F\u7070\u4E91\u661F\u7A7A\u4F18\u5148\u9002\u7528\u56E2\u961F\u5E93\uFF0C\u5176\u4ED6\u9879\u76EE\u6CBF\u7528\u539F\u98CE\u683C\uFF1B\u6240\u6709\u9879\u76EE\u7528UI/UX\u8BBE\u8BA1\u6807\u6CE8\u7CFB\u7EDF\u6807\u6CE8\u3002libraryId\u5FC5\u586B\uFF0Ckind\u9009components/styles/variables\uFF1Bpage/query\u67E5\u76EE\u5F55\uFF0CfamilyId\u67E5\u53D8\u4F53\u3002\u8FD4\u56DE\u771F\u5B9Ekey\u4E0E\u53D1\u5E03\u72B6\u6001\uFF0C\u76EE\u5F55\u547D\u4E2D\u4E0D\u4EE3\u8868\u5DF2\u5BFC\u5165\uFF1B\u8BBE\u5907\u7AEF\u672A\u5B8C\u6574\u7D22\u5F15\uFF0C\u4E0D\u7F16\u9020\u5E93ID\u3002",
   {
     libraryId: nodeIdSchema,
     kind: external_exports.enum(["components", "styles", "variables"]).default("components"),
@@ -48333,7 +48334,7 @@ register(
 );
 register(
   "resolve_vue_component",
-  "\u6309 \u9879\u76EE\u7EC4\u4EF6 \u2192 Ant Design Vue \u2192 \u5FC5\u8981\u65F6\u65B0\u589E \u7684\u987A\u5E8F\u9009\u62E9\u7EC4\u4EF6\u3002\u7F3A\u5C11 Pixso \u6620\u5C04\u4F1A\u660E\u786E\u8FD4\u56DE needs-mapping\uFF0C\u4E0D\u80FD\u5047\u88C5\u5DF2\u590D\u7528\u3002",
+  "\u4EC5\u7528\u4E8EVue\u4EE3\u7801\u6620\u5C04\uFF1A\u6309\u9879\u76EE\u7EC4\u4EF6 \u2192 Ant Design Vue \u2192 \u5FC5\u8981\u65F6\u65B0\u589E\u9009\u62E9\u5019\u9009\u3002\u7F3A\u5C11Pixso\u6620\u5C04\u8FD4\u56DEneeds-mapping\uFF0C\u4E0D\u80FD\u5047\u88C5\u5DF2\u590D\u7528\u3002\u7EAF\u8BBE\u8BA1\u7EC4\u4EF6\u4E0E\u98CE\u683C\u6309hd-design\u9879\u76EE/\u7AEF\u89C4\u5219\u9009\u62E9\uFF0C\u4E0D\u636E\u6B64\u66FF\u6362\u65E2\u6709\u8BBE\u8BA1\u7CFB\u7EDF\u3002",
   { semantic: external_exports.string().min(1), projectRoot: external_exports.string().optional() },
   (args) => service.resolveComponent(args)
 );

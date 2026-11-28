@@ -51,6 +51,8 @@ for (const file of [
   'assets/libraries/company-styles.json',
   'assets/libraries/annotations.json',
   'skills/hd-design/references/library.md',
+  'skills/hd-design/references/design-iteration.md',
+  'skills/hd-design/references/xiaohuiyun.md',
 ])
   await access(file);
 for (const entry of await readJson('assets/libraries/registry.json')) {
