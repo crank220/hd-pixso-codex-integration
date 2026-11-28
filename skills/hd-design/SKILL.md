@@ -1,11 +1,29 @@
 ---
 name: hd-design
-description: 在 Codex 中完成 Pixso Web 设计与改版，支持本地桌面 MCP 和官方远程 MCP 图层链接；复用组件，结合 UI/UX Pro Max 精修图层尺寸、对齐、图标状态，并按公司系统在画板外标注。
+description: HD Codex + Pixso 双向工作流，用于 Pixso Web 设计、改稿、组件库接入及 HD 插件维护。读取最新画布，在授权范围复用公司样式、标注与 Ant Design Vue 组件，结合 UI/UX Pro Max 精修交互和图层。
 ---
 
 # HD Codex + Pixso 双向工作流
 
 在 Codex 描述需求，在 Pixso 桌面端或网页端查看、编辑结果。使用本插件 `hd_pixso` 工具；先读后写，限制在用户指定文件/页面/子树。设计任务本身不自动扩大为开发另一个网站或修改业务代码。
+
+## 分类与按需读取
+
+| 分类 | 何时使用 | 参考 |
+| --- | --- | --- |
+| 连接与范围 | 本地/远程接入、页面定位、手动改稿 | [连接](references/connections.md)、[图层操作](references/operations.md) |
+| 资源复用 | 公司样式、标注组件、UI控件、代码映射 | [资源库](references/library.md)、[组件映射](references/component-mapping.md) |
+| 图层与交互 | 尺寸对齐、多个页面/画布、图标与状态 | [精修](references/quality.md)、[图标状态](references/icon-states.md) |
+| 标注与验收 | 控件差异、编号、原生注释、截图交付 | [标注](references/annotations.md) |
+| 插件维护与经验 | 明确要求审查、精简、接库、发布或沉淀 | [维护](references/plugin-maintenance.md)、[采用证据](references/adopted-evidence.md) |
+
+只读取当前任务需要的分类。双向指 Codex 能读取 Pixso 的最新手动调整并继续编辑；不代表实时同步、原型可运行或代码与设计稿自动互转。
+
+## 调研与经验更新
+
+仅在存在影响决策的未知点时调研，例如远程是否支持目标操作、共享组件发布状态、原生注释入口或具体版本能力。先核对当前工具 schema 与代码，再查官方文档；分别记录官方能力、本插件实现、真实账号验证。不要把上游新增工具当成本插件已开放。
+
+用户要求沉淀经验时，按「提出 → 确认 → 执行 → 验证」筛选，在已有参考分类中补充会改变执行判断的规则；来源、采用依据、验证限制和失效条件放入[采用证据](references/adopted-evidence.md)。Obsidian 按现有目录维护中文能力卡与来源链接，不复制第二份技能正文。调研或设计任务不会自动授权插件发布、源库发布或知识库同步。
 
 ## 连接与定位
 

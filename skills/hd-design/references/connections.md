@@ -21,8 +21,10 @@ https://pixso.cn/app/design/<fileKey>?item-id=123%3A456
 
 官方连接、席位、查看/编辑权限由 Pixso 验证。未经真实账号授权与目标文件测试，交付中写明“远程链路通过模拟协议测试，真实账号编辑尚未验证”；一次401只证明需要授权，不证明读写已联调。
 
-官方依据（核对日期2026-11-26）：
+官方依据（重新核对日期2026-11-27）：
 - https://pixso.cn/developer/zh/mcp/remote-mcp.html
 - https://pixso.cn/developer/zh/mcp/tools.html
+
+官方新增能力不等于插件已开放；调用前核对当前 `hd_pixso` 工具schema与实际协议版本。插件缓存版本、仓库源码和技能文件可能不同，开启新会话也需确认已加载版本。调研结论与验证边界见[采用证据](adopted-evidence.md#本次有价值的外部调研)。
 
 本地 `pixso_begin({pageName:"03 控件差异与交互"})` 精确匹配当前文件的唯一页面，不改变设计师的活动页。重名返回 PAGE_NAME_AMBIGUOUS，缺失返回 PAGE_NAME_MISMATCH；一个 token 只绑定一个页面/子树。未传 pageName 时仍在切换活动页后拒写。

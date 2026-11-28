@@ -1,6 +1,6 @@
 {
   "name": "hd-pixso-codex-integration",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "private": true,
   "type": "module",
   "description": "HD Codex + Pixso 双向工作流：支持本地/远程连接、组件与品牌样式复用、图层精修及公司 UI/UX 标注。",
